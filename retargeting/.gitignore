@@ -1,0 +1,17 @@
+# Gated / large data and downloaded artifacts — never commit these
+data/
+out/
+*.npy
+*.npz
+*.pkl
+*.mp4
+# SMPL / SMPL-X body models (license-gated, never redistribute)
+body_models/
+smplx/
+smpl/
+# local venvs for this sub-pipeline
+.venv_rt/
+.venv_gmr/
+__pycache__/
+*.pyc
+.pytest_cache/
