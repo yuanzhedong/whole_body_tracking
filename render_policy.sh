@@ -13,8 +13,9 @@
 set -euo pipefail
 HERE="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"; cd "$HERE"
 
-CKPT=""; MOTION=""; OUT="policy_render.mp4"; STEPS=500; CAMERA="treadmill"; FPS=25; GPU=0; TASK="Tracking-Flat-G1-v0"; WANDB_RUN=""; CAPTION=""
+CKPT=""; MOTION=""; OUT="policy_render.mp4"; STEPS=500; CAMERA="treadmill"; FPS=25; GPU=0; TASK="Tracking-Flat-G1-v0"; WANDB_RUN=""; CAPTION=""; PHASE0=""
 while [[ $# -gt 0 ]]; do case "$1" in
+  --phase0) PHASE0="--start_phase0"; shift 1;;   # start rollout at motion frame 0 (clean from-the-start clip)
   --ckpt) CKPT="$2"; shift 2;;
   --motion) MOTION="$2"; shift 2;;
   --out) OUT="$2"; shift 2;;
@@ -51,7 +52,7 @@ PY
 fi
 
 .venv/bin/python tools/rollout_log.py --task="$TASK" --num_envs 1 --steps "$STEPS" \
-  --ckpt "$CKPT" --motion_file "$MOTION_NPZ" --out "$STATES" --headless
+  --ckpt "$CKPT" --motion_file "$MOTION_NPZ" --out "$STATES" --headless $PHASE0
 echo "    states: $STATES"
 
 echo "[2/3] rendering in Isaac Sim 6.0 (.venv6)..."

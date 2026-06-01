@@ -12,6 +12,9 @@ parser.add_argument("--steps", type=int, default=500)
 parser.add_argument("--ckpt", required=True)
 parser.add_argument("--motion_file", required=True)
 parser.add_argument("--out", default="/tmp/rollout_states.npz")
+parser.add_argument("--start_phase0", action="store_true",
+                    help="start the rollout at motion frame 0 (deterministic) instead of a random "
+                         "phase — gives a clean from-the-beginning clip.")
 cli_args.add_rsl_rl_args(parser)
 AppLauncher.add_app_launcher_args(parser)
 args, hydra_args = parser.parse_known_args()
@@ -43,6 +46,22 @@ def main(env_cfg, agent_cfg):
     joint_names = list(robot.data.joint_names)
     body_names = list(robot.data.body_names)
     origin = env.unwrapped.scene.env_origins[0].clone()  # subtract so root is world-centered
+
+    if args.start_phase0:
+        # Pin the motion start to frame 0: override adaptive sampling to set time_steps=0, then
+        # reset so the robot is placed at the phase-0 reference pose. Gives a clean from-the-start clip.
+        try:
+            cmd = env.unwrapped.command_manager.get_term("motion")
+        except Exception:
+            cmd = env.unwrapped.command_manager._terms["motion"]
+
+        def _pin_zero(env_ids):
+            if len(env_ids) > 0:
+                cmd.time_steps[env_ids] = 0
+        cmd._adaptive_sampling = _pin_zero
+        env.unwrapped.reset()
+        cmd.time_steps[:] = 0
+        print("START_PHASE0: pinned motion to frame 0")
 
     # Log per-body world poses (forward kinematics from the sim) in addition to root+joints.
     # The renderer replays these link transforms directly, so the rendered mesh matches the
