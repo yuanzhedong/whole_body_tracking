@@ -43,6 +43,31 @@ CUDA_DEVICE_ORDER=PCI_BUS_ID CUDA_VISIBLE_DEVICES=1 OMNI_KIT_ACCEPT_EULA=YES \
   emphasis projection / character-frame state featurization (Phase 2/3).
 - `out/` is git-ignored.
 
+## Phase-1 verification gate (`verify_vae.py`) — run BEFORE the diffusion
+A distilled VAE can pass action-MSE yet still drift/fall closed-loop, or have a degenerate latent
+that's useless for diffusion. So we gate on 4 checks, each vs the teacher:
+
+| gate | proves | metric | pass |
+|---|---|---|---|
+| **G1** reconstruction | decoder learned the teacher map | `‖decode(μ,proprio) − a_teacher‖` | small MSE |
+| **G2** closed-loop *(hard gate)* | VAE *policy* controls the robot | success rate, E_mpbpe, E_mpjpe vs teacher | success ≥ 0.9× teacher, E_mpbpe ≤ 1.3× |
+| **G3** latent structure | latent smooth, **used**, ~N(0,I) | agg-posterior, active dims, **z-ablation** `‖decode(E(ref))−decode(0)‖` | z-ablation ≥ 0.1, ≥2 active dims |
+| **G4** robustness | recovery basin for Phase-2 OU noise | closed-loop + action noise → fall rate | recovers |
+
+**Do not proceed to the diffusion until G2 + G3 pass.** G3's z-ablation is critical: if the decoder
+ignores the latent, the diffusion (which models that latent) has nothing meaningful to generate.
+```bash
+.venv/bin/python stage2/verify_vae.py --vae stage2/out/vae_walk.pt \
+    --teacher_ckpt <walk model_29999.pt> --motion_file /tmp/wbt_fix/walk.npz
+```
+
+## Verification ladder for the whole Fig-7 reproduction (each sub-step gated)
+- ✅ Stage-0 tracking: success rate / convergence (already verified, see scorecard report).
+- ⏳ **VAE: G1–G4 above** (this phase).
+- ☐ Phase-2 data: trajectory coverage + error-band stats.
+- ☐ Latent diffusion: *unconditional* generation → decode → rollout (does generated motion track?).
+- ☐ Guidance: per-task success (joystick follows cmd, waypoint reached, obstacle avoided).
+
 ## Status
-Phase 1 implemented; Phases 2–4 are the diffusion side (see the paper's §S3/Tables S6–S7 for the
-exact diffusion config: horizon 16, history 4, transformer 512-dim/8-heads/6-layers, 20 denoise steps).
+Phase 1 implemented + verification harness. Phases 2–4 are the diffusion side (paper §S3 / Tables
+S6–S7: horizon 16, history 4, transformer 512-dim/8-heads/6-layers, 20 denoise steps).
