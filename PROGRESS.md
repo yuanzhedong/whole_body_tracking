@@ -5,6 +5,39 @@ Reproducing BeyondMimic end-to-end (Fig 7) and integrating G1 robot motion into 
 
 ---
 
+## 2026-06-05 — G1-VAE training + new tracking policies launched
+
+**G1-VAE v1 training — RUNNING** (GPU 4, UniMoTok, `experiments/biomechanics_tokenizer/G1_MldVAE_v1/`)
+- Stack: `MldVaeBiomechanics` (22.4M params, latent [1,256], 9-layer encoder_decoder, nfeats=41).
+- Data: 12 LAFAN1/walk clips, 36,795 train windows @ 20 fps / 128-frame, y-up, **no quality filter yet**.
+- 50k epochs (9 batches/epoch ≈ 450k gradient steps), AdamW lr=1e-4, cosine decay.
+- WandB: https://wandb.ai/cs224n-robustqa/g1-motion-tokenizer/runs/z6ykfmkx
+- Early result at epoch 48: val loss 5.657 and **decreasing** (from 5.78 at epoch 40). Training confirmed working.
+- Checkpoints at `UniMoTok/experiments/biomechanics_tokenizer/G1_MldVAE_v1/checkpoints/`.
+
+**Bugs fixed during launch** (all on `wbt-integration` branch, commits `e6fb9bf`, `83e8aae`):
+- `metrics/base.py`: lazy-import so `METRIC.TYPE=[]` doesn't pull fasttext/smplx/NLP at startup.
+- `biomechanics_tokenizer.py`: generalize recons_slice, root_orient_loss, root_orient_velocity_loss
+  to arbitrary feature dims (was hardcoded to 49/52; G1 is 41).
+- `callback.py`: replace RichProgressBar with TQDMProgressBar (Rich crashes headless on sanity check).
+- `G1DataModule.py`: new datamodule reading stage2/out/g1_dataset_yup/{train,val,test}/*.npz.
+- Deps installed: pandas, loguru, matplotlib, opencv-headless, smplx, rich, wandb, CUDA torch 2.5.1+cu124.
+
+**Stage-2 VAE 50k iter distillation — RUNNING** (GPU 1, walk teacher)
+- At 7300/50000 iters, recon 1.99 and declining (21.7 it/s, ~31 min to completion).
+- Output: `stage2/out/vae_walk_50k.pt`.
+
+**Per-clip tracking quality eval — RUNNING** (GPU 5)
+- Evaluating 12 clips with walk teacher; output → `stage2/out/track_quality.json`.
+- When done: auto-trigger re-export with `--quality_json` + `--to_yup` → `g1_dataset_yup_filtered/`.
+- Then: auto-trigger G1-VAE v2 training on filtered data.
+
+**Sequential new tracking policies — QUEUED** (launches on GPU 1 after Stage-2 finishes)
+- Queue: lafan_run1_subject2, lafan_sprint1_subject2, lafan_jumps1_subject1, lafan_dance1_subject1.
+- Each: 30k iter, 2048 envs, W&B registry. Will take ~2h each.
+
+---
+
 ## 2026-06-05 — G1 → OmniMM pipeline: Steps 1 & 2
 
 **Step 1 — G1 motion exporter** (`stage2/export_g1_motion.py`, commit `b5708ba` + update)
