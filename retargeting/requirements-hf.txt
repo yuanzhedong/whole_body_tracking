@@ -1,0 +1,8 @@
+# CPU-only deps for the pre-retargeted-AMASS path (no Isaac, no SMPL).
+# Install into a small venv, e.g.:
+#   uv venv --python 3.10 retargeting/.venv_rt
+#   retargeting/.venv_rt/bin/python -m pip install -r retargeting/requirements-hf.txt
+# (The repo's main .venv already has these, so you can also just use that.)
+huggingface_hub>=0.23
+numpy
+pytest
