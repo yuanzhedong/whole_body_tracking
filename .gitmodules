@@ -1,0 +1,4 @@
+[submodule "UniMoTok"]
+	path = UniMoTok
+	url = git@github.com:Juzezhang/UniMoTok.git
+	branch = wbt-integration
