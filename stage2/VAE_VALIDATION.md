@@ -57,21 +57,29 @@ reference motion clip
 ## Run commands
 
 ```bash
-# Phase 0 only (no Isaac, fast — just VAE + numpy):
+# Phase 0+1 only (no Isaac, fast — VAE encode/decode + decoded npz creation):
 .venv/bin/python stage2/sim2sim_vae_eval.py \
     --vae_ckpt UniMoTok/experiments/biomechanics_tokenizer/G1_MldVAE_v1/checkpoints/epoch=564.ckpt \
     --dataset_dir stage2/out/g1_dataset_yup \
     --teacher_ckpt logs/rsl_rl/g1_flat/2026-05-30_15-59-30_walk_4090_full30k/model_29999.pt \
-    --splits val test --out stage2/out/sim2sim_eval.json --phase0_only
+    --splits val test --out stage2/out/sim2sim_eval.json --phase01_only
 
-# Full pipeline (Phase 0 + 1 + 2, requires Isaac Sim on a 4090):
+# Full pipeline (Phase 0+1+2, requires Isaac — only run when NO other Isaac process is running):
+# NOTE: Phase 2 blocked while any other Isaac process (e.g. run policy training) is running.
+# The DriverShaderCacheManager is machine-wide; only the first Isaac process to start can init it.
 CUDA_DEVICE_ORDER=PCI_BUS_ID CUDA_VISIBLE_DEVICES=4 OMNI_KIT_ACCEPT_EULA=YES \
   .venv/bin/python stage2/sim2sim_vae_eval.py \
-    --vae_ckpt UniMoTok/experiments/biomechanics_tokenizer/G1_MldVAE_v1/checkpoints/epoch=564.ckpt \
+    --vae_ckpt UniMoTok/experiments/biomechanics_tokenizer/<ckpt>/epoch=N.ckpt \
     --dataset_dir stage2/out/g1_dataset_yup \
-    --teacher_ckpt logs/rsl_rl/g1_flat/2026-05-30_15-59-30_walk_4090_full30k/model_29999.pt \
+    --teacher_ckpt logs/rsl_rl/g1_flat/.../model_29999.pt \
     --splits val test --out stage2/out/sim2sim_eval.json
 ```
+
+**IMPORTANT — Isaac concurrency constraint:** Only one Isaac Sim process can hold the
+`DriverShaderCacheManager` at a time. This is a machine-wide singleton (not per-GPU).
+All Isaac jobs (training, eval, verify, sim2sim Phase 2) must run serially. The first
+process to start initializes it; subsequent ones get a "init without shutdown" warning
+and have a broken PhysX CUDA pipeline → "no kernel image" errors in gym.make.
 
 ---
 
@@ -95,9 +103,14 @@ CUDA_DEVICE_ORDER=PCI_BUS_ID CUDA_VISIBLE_DEVICES=4 OMNI_KIT_ACCEPT_EULA=YES \
 **Verdict: FAIL.** Joint angle RMSE is 4–5× above the 0.10 rad target. Root orientation error
 is very large (31–74°). The VAE is not reconstructing motion faithfully enough.
 
-**Phase 1 + 2:** Not run — Phase 0 already shows the model is not ready. Running Phase 2
-with this quality of reconstruction would produce poor tracking due to the VAE output, not the
-tracker.
+**Phase 1 (2026-06-06, smoke test) — PASS:**
+- Pipeline: encode clip → decode → splice decoded joint angles into original motion npz (root from original).
+- `lafan_fallAndGetUp1_subject1_decoded.npz` created successfully: 8410 frames, 29 joints replaced.
+- Decoded npz format valid — all required keys present (`joint_pos`, `body_pos_w`, etc.).
+
+**Phase 2 — BLOCKED** (Isaac `DriverShaderCacheManager` held by run policy):
+- `gym.make` fails with "no kernel image" when any other Isaac process is running.
+- Will run when run policy (lafan_run1_subject2) finishes (~6h from 2026-06-06 17:39).
 
 **Root cause — data starvation:**
 - 12 clips = 581 train windows. A 22.4M-param Transformer VAE needs far more data.

@@ -5,6 +5,40 @@ Reproducing BeyondMimic end-to-end (Fig 7) and integrating G1 robot motion into 
 
 ---
 
+## 2026-06-06 — Autonomous session: sim2sim pipeline + G1-VAE v2
+
+**sim-to-sim validation pipeline** (`stage2/sim2sim_vae_eval.py`, commit `21ea483`)
+- **Phase 0+1 fully proven** (no Isaac): encode→decode→splice-into-motion-npz works cleanly.
+  See `stage2/VAE_VALIDATION.md` for detailed results.
+- **Phase 2 (Isaac tracking comparison) blocked**: Isaac's `DriverShaderCacheManager` is a
+  machine-wide singleton held by the run policy. New Isaac processes can't initialize while it
+  runs. Will execute Phase 2 when run policy finishes (~6h from now).
+- Key fix chain: CUDA device→CPU for VAE, `import whole_body_tracking.tasks` at module level,
+  Phase 1 switched from FK-replay to joint-splice (avoids Isaac entirely for decode→npz).
+
+**G1-VAE v2 training — RUNNING** (GPU 5, UniMoTok, `experiments/biomechanics_tokenizer/G1_MldVAE_v2_smallreg/`)
+- Smaller model to fight overfitting: num_layers=5, ff_size=1024, latent=[1,128] (~7M params vs 22.4M).
+- Stronger regularization: KL=5e-5, dropout=0.15, weight_decay=1e-4.
+- step_size=32 (was 64) → 1162 train windows (2× more than v1).
+- Same 12-clip dataset (y-up, no quality filter yet). Quality filter pending run policy finishing.
+- WandB: `cs224n-robustqa/g1-motion-tokenizer` (new run auto-created).
+
+**G1-VAE v1 — STOPPED** (was overfitting from epoch ~600 onwards)
+- Best checkpoint: `epoch=564.ckpt`, val_loss=3.481 (train=0.87→val=3.48, gap=2.6 = severe overfitting).
+- Root cause: 12 clips / 581 train windows insufficient for 22.4M-param Transformer.
+
+**Run policy (lafan_run1_subject2)** — TRAINING, GPU 1, ~6h remaining
+- `logs/rsl_rl/g1_flat/lafan_run1_subject2_full30k/`, WandB: W&B auto-logged.
+- Sequential watcher will launch sprint, jump, dance, fight after it finishes.
+
+**Zombie process cleanup — 2026-06-06**
+- Killed 4 csv_to_npz Isaac processes from 5–6 days ago (holding ~6 GB on GPU 5).
+- Root cause of all subsequent Isaac failures: `DriverShaderCacheManager` held by zombies.
+- After cleanup, run policy holds the singleton exclusively.
+- `fuser /dev/nvidiaN` is the correct command to identify processes holding a GPU.
+
+---
+
 ## 2026-06-05 — G1-VAE training + new tracking policies launched
 
 **G1-VAE v1 training — RUNNING** (GPU 4, UniMoTok, `experiments/biomechanics_tokenizer/G1_MldVAE_v1/`)
