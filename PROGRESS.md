@@ -5,6 +5,12 @@ Reproducing BeyondMimic end-to-end (Fig 7) and integrating G1 robot motion into 
 
 ---
 
+## 2026-06-06 22:45 — Wakeup check: run policy ~10min left — finishing NOW
+
+- Run policy: RUNNING, ETA ~00:10 (~22:55 finish) — finishing within minutes
+
+---
+
 ## 2026-06-06 22:34 — Wakeup check: run policy ~23min left — imminent
 
 - Run policy: RUNNING, ETA ~00:23 (~22:57 finish) — IMMINENT
