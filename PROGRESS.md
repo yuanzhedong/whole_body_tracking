@@ -5,6 +5,15 @@ Reproducing BeyondMimic end-to-end (Fig 7) and integrating G1 robot motion into 
 
 ---
 
+## 2026-06-06 19:16 — Wakeup check: all jobs running, ~4.4h to run policy exit
+
+- Run policy: RUNNING, ETA ~04:26 (~23:40 finish)
+- G1-VAE v2: epoch=5389, train=1.034, val=3.336 (gap from best=+0.28, still below kill threshold 3.5)
+- Post-watcher: sleeping, queued jobs still pending
+- No output files yet
+
+---
+
 ## 2026-06-06 18:14 — G1-VAE v2 best checkpoint confirmed, data bottleneck proven
 
 **G1-VAE v2 best checkpoint: `epoch=1079.ckpt` (val=3.054)**
