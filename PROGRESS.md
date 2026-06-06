@@ -5,6 +5,30 @@ Reproducing BeyondMimic end-to-end (Fig 7) and integrating G1 robot motion into 
 
 ---
 
+## 2026-06-06 18:14 — G1-VAE v2 best checkpoint confirmed, data bottleneck proven
+
+**G1-VAE v2 best checkpoint: `epoch=1079.ckpt` (val=3.054)**
+
+Full comparison (Phase 0 RMSE on OOD val/test clips):
+
+| model | params | val loss | jt RMSE (fall) | jt RMSE (dance) |
+|---|---|---|---|---|
+| v1 epoch 564 | 22.4M | 3.481 | 0.418 rad | 0.359 rad |
+| **v2 epoch 1079** | 7M | **3.054** | 0.424 rad | **0.351 rad** |
+| v2 epoch 3569 | 7M | 3.227 | 0.435 rad | 0.361 rad |
+| target | — | — | **< 0.10 rad** | **< 0.10 rad** |
+
+**Conclusion: data bottleneck proven.** Val loss improved 12% (3.054 vs 3.481) but RMSE is
+essentially unchanged — both models fail equally on OOD categories (fall/dance) because they've
+never seen those motion types. Neither model size nor regularization helps. Need diverse clips.
+
+**v2 current state** (epoch 3569): past best, slowly overfitting (gap 3.054→3.227). Will continue
+to 20k since v3 will replace it after new category data arrives. Best ckpt = epoch=1079.
+
+**Still waiting:** run policy ETA ~5h. Post-watcher queued (quality eval → re-export → verify → sim2sim Phase 2 → sprint).
+
+---
+
 ## 2026-06-06 17:42 — G1-VAE v2 vs v1 comparison + wakeup check
 
 **G1-VAE v2 (epoch 1809, ~30 min wakeup check):**
