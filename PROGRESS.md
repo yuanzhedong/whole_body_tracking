@@ -5,6 +5,14 @@ Reproducing BeyondMimic end-to-end (Fig 7) and integrating G1 robot motion into 
 
 ---
 
+## 2026-06-06 21:46 — Wakeup check: run policy ~1.3h left — final stretch
+
+- Run policy: RUNNING, ETA ~01:17 (~23:00 finish)
+- G1-VAE v2: epoch=13937, train=0.757, val=**3.314** (dipped slightly below plateau — minor fluctuation or small improvement; still well below kill threshold 3.5)
+- Post-watcher: sleeping — will fire immediately on run policy exit
+
+---
+
 ## 2026-06-06 21:20 — Wakeup check: run policy ~1.8h left — approaching finish
 
 - Run policy: RUNNING, ETA ~01:49 (~23:09 finish)
