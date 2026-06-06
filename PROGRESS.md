@@ -5,6 +5,28 @@ Reproducing BeyondMimic end-to-end (Fig 7) and integrating G1 robot motion into 
 
 ---
 
+## 2026-06-06 17:42 — G1-VAE v2 vs v1 comparison + wakeup check
+
+**G1-VAE v2 (epoch 1809, ~30 min wakeup check):**
+- WandB run `en071hgo`, train=1.856, val=**3.138** (stable, not diverging)
+- v2 val=3.138 vs v1 best val=3.481 → **10% lower** — smaller model reduces overfitting
+
+**Phase 0 RMSE (v2 epoch=1809 vs v1 epoch=564):**
+
+| clip | category | v1 RMSE | v2 RMSE | conclusion |
+|---|---|---|---|---|
+| lafan_fallAndGetUp | fall (OOD) | 0.418 rad | 0.435 rad | ~same |
+| dance1 | dance (OOD) | 0.359 rad | 0.361 rad | ~same |
+
+**Key insight: data bottleneck confirmed.** Both models hit the same reconstruction floor because
+neither has seen fall/dance clips in training (only walk-heavy 12 clips). Smaller model reduces
+overfitting but can't generalize to unseen categories. Need run/sprint/jump/dance/fight clips.
+
+**All Isaac jobs remain blocked** until run policy (PID 3484795) finishes in ~5.5h.
+Post-watcher will then fire: quality eval → re-export → Stage-2 verify → sim2sim Phase 2 → sprint.
+
+---
+
 ## 2026-06-06 — Autonomous session: sim2sim pipeline + G1-VAE v2
 
 **sim-to-sim validation pipeline** (`stage2/sim2sim_vae_eval.py`, commit `21ea483`)
