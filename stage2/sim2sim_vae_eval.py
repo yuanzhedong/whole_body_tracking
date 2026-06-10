@@ -46,6 +46,10 @@ parser.add_argument("--vae_ckpt",     required=True)
 parser.add_argument("--dataset_dir",  default="stage2/out/g1_dataset_yup")
 parser.add_argument("--artifacts_dir",default="artifacts")
 parser.add_argument("--splits",       nargs="+", default=["val", "test"])
+parser.add_argument("--clips",         nargs="+", default=None,
+                    help="only evaluate clips whose name contains one of these substrings "
+                         "(e.g. --clips walk1_subject1). Needed for per-clip Phase-2 with a "
+                         "clip-specific teacher. Default: all clips in the split(s).")
 parser.add_argument("--teacher_ckpt", required=True)
 parser.add_argument("--out",          default="stage2/out/sim2sim_eval.json")
 parser.add_argument("--decoded_dir",  default=None)
@@ -79,6 +83,11 @@ parser.add_argument("--phase01_only", action="store_true",
                     help="Phase 0+1+3 only — skips Isaac entirely (Phase 3 needs no Isaac)")
 parser.add_argument("--skip_phase3", action="store_true",
                     help="skip the Phase-3 generative-readiness gate")
+parser.add_argument("--max_motion_frames", type=int, default=800,
+                    help="Phase 2: truncate the motion npz to the first N frames before tracking. "
+                         "gym.make loads the WHOLE motion buffer, so long clips (e.g. 13k frames) "
+                         "make env setup slow regardless of --max_steps. We only need ~max_steps "
+                         "control frames; 800 (=16s @50Hz) covers max_steps=300 with margin. 0=full.")
 parser.add_argument("--gen_samples", type=int, default=128,
                     help="Phase 3: number of prior z~N(0,I) samples to decode")
 parser.add_argument("--interp_pairs", type=int, default=8,
@@ -147,7 +156,10 @@ def load_clips(dataset_dir, splits):
         if not os.path.isdir(d): continue
         for f in sorted(os.listdir(d)):
             if f.endswith(".npz"):
-                clips.append({"name": f[:-4], "split": split,
+                name = f[:-4]
+                if args.clips and not any(c in name for c in args.clips):
+                    continue
+                clips.append({"name": name, "split": split,
                                "path": os.path.join(d, f)})
     return clips
 
@@ -350,6 +362,24 @@ def phase3(vae, clips, mean, std, gen_samples=128, interp_pairs=8, interp_steps=
     return res
 
 
+def _truncate_motion(path, n):
+    """Write a copy of a motion npz truncated to the first n frames (all time-indexed arrays).
+    gym.make loads the full motion buffer; truncating bounds env-setup cost for long clips."""
+    if not n or n <= 0:
+        return path
+    d = np.load(path, allow_pickle=True)
+    arrs = {k: d[k] for k in d.files}
+    T = arrs["joint_pos"].shape[0]
+    if T <= n:
+        return path
+    for k, v in arrs.items():
+        if hasattr(v, "shape") and v.ndim >= 1 and v.shape[0] == T:
+            arrs[k] = v[:n]
+    out = path.replace(".npz", f"_trunc{n}.npz")
+    np.savez(out, **arrs)
+    return out
+
+
 # ── Phase 2 inside hydra context ─────────────────────────────────────────────
 
 def phase2_inside_hydra(clips, env_cfg, agent_cfg, artifacts_dir, eval_reps):
@@ -370,6 +400,7 @@ def phase2_inside_hydra(clips, env_cfg, agent_cfg, artifacts_dir, eval_reps):
             print(f"  skip {clip['name']}: original not found"); continue
 
         def run_one(path):
+            path = _truncate_motion(path, args.max_motion_frames)
             env_cfg.commands.motion.motion_file = path
             env    = gym.make(args.task, cfg=env_cfg, render_mode=None)
             env    = RslRlVecEnvWrapper(env)
@@ -412,6 +443,7 @@ def phase2_inside_hydra(clips, env_cfg, agent_cfg, artifacts_dir, eval_reps):
             # a fallen robot teleport back and "recover", inflating survival). A fallen robot left
             # un-reset just ragdolls; on an idle box this stays ~28-32ms/step (the prior "reset/
             # thrashing ~2000ms" was CPU contention from co-located training, not PhysX).
+            path = _truncate_motion(path, args.max_motion_frames)
             env_cfg.commands.motion.motion_file = path
             env_cfg.terminations.anchor_pos = None
             env_cfg.terminations.anchor_ori = None
