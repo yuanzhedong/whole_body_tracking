@@ -87,7 +87,20 @@ The deck's recipe, applied to robot-motion:
 - **New tasks unlocked:** T2R (text→robot-motion), R2T, M2R/R2M (human↔robot motion), and the cross-grounding the deck motivates ("different modalities mutually grounded").
 
 What OmniMM needs from us: the **trained G1-VAE checkpoint** + the **representation/normalization
-stats** + this spec. We hand those over; they wire the branch.
+stats** + the **latent-standardization stats** + this spec. We hand those over; they wire the branch.
+
+**Generative-readiness gate (`sim2sim_vae_eval.py` Phase 3, no Isaac).** Because the diffusion stage
+GENERATES latents and decodes them (it never feeds the VAE a real encoding), reconstruction quality
+is necessary but not sufficient. Phase 3 checks the three properties diffusion actually needs:
+(A) aggregated posterior ≈ N(0,I); (B) prior-sampled z~N(0,I) decode to in-distribution, joint-valid,
+smooth motion; (C) latent interpolation stays smooth/in-distribution. Result on EX_T4w_base (9-clip,
+latent-128): **B + C PASS** (decoder is healthy off-manifold — smooth, valid, interpolable) but
+**A FAILS** — aggregate is mean 0.65 / std 1.68, not N(0,I). KL 5e-6 vs 5e-5 are identical here (both
+in the negligible-KL regime), so this is NOT fixed by the existing KL sweep. **Fix = ship the per-dim
+latent-standardization vectors** (Phase 3 emits `latent_standardization.{mean,std}`, length=latent_dim);
+latent diffusion rescales latents to ~unit variance anyway (cf. Stable Diffusion's 0.18215 factor),
+so a non-unit aggregate is a "hand over the stats" item, not a retrain blocker. Only retrain with
+orders-of-magnitude higher KL if a *natively* N(0,I) latent is required.
 
 ## 5. Decisions & risks
 

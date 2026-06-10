@@ -76,7 +76,15 @@ parser.add_argument("--reset_based", dest="no_reset", action="store_false",
                          "and continue; survival = time-outs / (time-outs + terminations). Inflates "
                          "survival via free recovery. Kept for comparison only.")
 parser.add_argument("--phase01_only", action="store_true",
-                    help="Phase 0+1 only — skips Isaac entirely")
+                    help="Phase 0+1+3 only — skips Isaac entirely (Phase 3 needs no Isaac)")
+parser.add_argument("--skip_phase3", action="store_true",
+                    help="skip the Phase-3 generative-readiness gate")
+parser.add_argument("--gen_samples", type=int, default=128,
+                    help="Phase 3: number of prior z~N(0,I) samples to decode")
+parser.add_argument("--interp_pairs", type=int, default=8,
+                    help="Phase 3: number of real-encoding pairs to interpolate between")
+parser.add_argument("--interp_steps", type=int, default=11,
+                    help="Phase 3: alpha steps along each interpolation path")
 # Pre-parse to check phase01_only before any Isaac imports
 _pre, _ = parser.parse_known_args()
 
@@ -224,6 +232,122 @@ def phase1(clips, decoded_dir, artifacts_dir):
                  body_lin_vel_w=d["body_lin_vel_w"], body_ang_vel_w=d["body_ang_vel_w"])
         clip["decoded_npz"] = out
         print(f"  saved {clip['name']}_decoded.npz  [{T} frames]")
+
+
+# ── Phase 3: generative readiness (no Isaac) ──────────────────────────────────
+# The OmniMM/diffusion stage GENERATES latents (z~N(0,I), or denoiser outputs) and
+# decodes them — it never feeds the VAE a real-motion encoding. So reconstruction
+# quality (Phase 0/2) is necessary but NOT sufficient: we must verify the decoder
+# produces valid G1 motion OFF the real-encoding manifold. Three checks, all on CPU:
+#   (A) aggregated posterior ≈ N(0,I)        -> diffusion's N(0,I) samples land on-manifold
+#   (B) prior-sample decode (z~N(0,I))       -> in-distribution, joint-valid, smooth motion
+#   (C) latent interpolation                 -> smooth path, midpoints stay in-distribution
+# If (B) fails, the latent space is unusable by diffusion regardless of recon RMSE.
+
+def _encode_windows(vae, feat_n, window_size=128, stride=64):
+    """Encode each 128-frame window of a normalized clip → (mu, logvar) tokens (latent_size, D)."""
+    T = feat_n.shape[0]
+    starts = list(range(0, max(1, T - window_size + 1), stride))
+    if not starts or starts[-1] + window_size > T:
+        starts = [max(0, T - window_size)]
+    mus, logvars = [], []
+    for s in starts:
+        w = feat_n[s:s+window_size]
+        if len(w) < window_size:
+            w = np.pad(w, ((0, window_size - len(w)), (0, 0)))
+        x = torch.from_numpy(w).unsqueeze(0)  # [1, 128, D]
+        with torch.no_grad():
+            dist = vae._encode_dist(x, [window_size])
+            _, mu, logvar = vae._dist_to_z(dist)  # (latent_size, 1, D)
+        mus.append(mu[:, 0]); logvars.append(logvar[:, 0])
+    return mus, logvars
+
+
+def phase3(vae, clips, mean, std, gen_samples=128, interp_pairs=8, interp_steps=11,
+           window_size=128):
+    import random
+    ls, D = vae.latent_size, vae.latent_dim
+
+    # --- collect real-window posteriors + real-motion baselines ---
+    all_mu, all_logvar = [], []
+    real_feat = []          # unnormalized real features (joint range + smoothness baseline)
+    for clip in clips:
+        feat = np.load(clip["path"], allow_pickle=True)["motion"].astype(np.float32)
+        real_feat.append(feat)
+        mus, lvs = _encode_windows(vae, (feat - mean) / std, window_size)
+        all_mu += mus; all_logvar += lvs
+    if not all_mu:
+        print("  phase3: no windows to encode — skipped"); return {}
+    mu_stack  = torch.stack(all_mu).reshape(-1, D).numpy()       # [Nwin*ls, D]
+    var_stack = np.exp(torch.stack(all_logvar).reshape(-1, D).numpy())
+    real_feat = np.concatenate(real_feat, 0)
+    jlo, jhi  = real_feat[:, 12:].min(0), real_feat[:, 12:].max(0)
+    real_dj99 = float(np.percentile(np.abs(np.diff(real_feat[:, 12:], 0)), 99))
+
+    # (A) aggregated posterior vs N(0,I): marginal q(z) = mean_x q(z|x).
+    # Per-dim mean/std are ALSO the latent-standardization stats to hand to diffusion: latent
+    # diffusion rescales latents to ~unit variance (cf. SD's 0.18215 factor), so a non-N(0,I)
+    # aggregate is fixed by shipping these vectors, not necessarily by retraining.
+    latent_mean = mu_stack.mean(0)                                          # (D,) per-dim
+    latent_std  = np.sqrt(mu_stack.var(0) + var_stack.mean(0))              # (D,) per-dim
+    agg_mu_mean_abs = float(np.abs(latent_mean).mean())                     # want ~0
+    agg_marginal_std = float(latent_std.mean())                            # want ~1
+    per_dim_kl = 0.5 * (mu_stack**2 + var_stack - np.log(var_stack) - 1).mean(0)
+    n_active = int((per_dim_kl > 0.01).sum())
+    prior_ok = (0.6 <= agg_marginal_std <= 1.4) and (agg_mu_mean_abs < 0.3) and (n_active >= 2)
+
+    # (B) prior-sample decode: z~N(0,I) -> motion (normalized) -> joints
+    torch.manual_seed(0)
+    with torch.no_grad():
+        rec_n = vae.decode(torch.randn(ls, gen_samples, D), [window_size]*gen_samples).numpy()
+    nan_frac = float(np.isnan(rec_n).mean()); rec_n = np.nan_to_num(rec_n)
+    in_dist_frac = float((np.abs(rec_n) < 3.0).mean())          # norm feats ~N(0,1) if in-dist
+    joints_gen = (rec_n * std + mean)[:, :, 12:]
+    margin = 0.10 * (jhi - jlo + 1e-6)
+    joint_range_frac = float(((joints_gen >= jlo - margin) & (joints_gen <= jhi + margin)).mean())
+    smooth_ratio = float(np.percentile(np.abs(np.diff(joints_gen, axis=1)), 99) / (real_dj99 + 1e-9))
+    decode_ok = (nan_frac == 0.0) and (in_dist_frac >= 0.95) and \
+                (joint_range_frac >= 0.95) and (smooth_ratio <= 3.0)
+
+    # (C) latent interpolation between real encodings
+    peak_ratios, indist = [], []
+    if len(all_mu) >= 2:
+        random.seed(0); pool = list(range(len(all_mu)))
+        for _ in range(interp_pairs):
+            i, j = random.sample(pool, 2)
+            zs = torch.stack([(1-a)*all_mu[i] + a*all_mu[j]
+                              for a in np.linspace(0, 1, interp_steps)], dim=1)  # (ls, K, D)
+            with torch.no_grad():
+                recs = vae.decode(zs, [window_size]*interp_steps).numpy()
+            dpath = np.abs(np.diff(recs, axis=0)).mean(axis=(1, 2))   # change per alpha-step
+            peak_ratios.append(float(dpath.max() / (dpath.mean() + 1e-9)))  # ~1 smooth, >> jumpy
+            indist.append(float((np.abs(recs) < 3.0).mean()))
+    interp_peak_ratio = float(np.mean(peak_ratios)) if peak_ratios else float("nan")
+    interp_indist     = float(np.mean(indist)) if indist else float("nan")
+    interp_ok = (not indist) or ((interp_indist >= 0.95) and (interp_peak_ratio <= 5.0))
+
+    gen_ready = bool(prior_ok and decode_ok and interp_ok)
+    res = {"n_windows": len(all_mu), "gen_samples": gen_samples,
+           "A_prior_match": {"agg_mu_mean_abs": round(agg_mu_mean_abs, 4),
+                             "agg_marginal_std": round(agg_marginal_std, 4),
+                             "active_dims_kl>0.01": n_active, "latent_dim": D, "pass": prior_ok,
+                             "latent_standardization": {"mean": [round(float(v), 5) for v in latent_mean],
+                                                        "std":  [round(float(v), 5) for v in latent_std]}},
+           "B_prior_sample_decode": {"nan_frac": round(nan_frac, 4),
+                             "in_distribution_frac": round(in_dist_frac, 4),
+                             "joint_range_frac": round(joint_range_frac, 4),
+                             "smoothness_ratio_vs_real": round(smooth_ratio, 3), "pass": decode_ok},
+           "C_interpolation": {"peak_over_avg_step": round(interp_peak_ratio, 3),
+                             "in_distribution_frac": round(interp_indist, 4), "pass": interp_ok},
+           "gen_ready": gen_ready}
+    print(f"  (A) prior match     mu|mean|={agg_mu_mean_abs:.3f} aggStd={agg_marginal_std:.3f} "
+          f"active={n_active}/{D}  [{'PASS' if prior_ok else 'FAIL'}]")
+    print(f"  (B) prior-sample    in_dist={in_dist_frac:.3f} joint_range={joint_range_frac:.3f} "
+          f"smooth×{smooth_ratio:.2f} nan={nan_frac:.3f}  [{'PASS' if decode_ok else 'FAIL'}]")
+    print(f"  (C) interpolation   in_dist={interp_indist:.3f} peak/avg={interp_peak_ratio:.2f}  "
+          f"[{'PASS' if interp_ok else 'FAIL'}]")
+    print(f"\nPhase 3: generative-ready = {'YES' if gen_ready else 'NO'}")
+    return res
 
 
 # ── Phase 2 inside hydra context ─────────────────────────────────────────────
@@ -383,6 +507,11 @@ if args.phase01_only:
         for c in clips:
             if "decoded_npz" in c:
                 output["clips"].setdefault(c["name"],{})["decoded_npz"]=c["decoded_npz"]
+        if not args.skip_phase3:
+            print("\n── Phase 3: generative readiness ────────────────────────────")
+            output["gen_readiness"] = phase3(vae, clips, mean, std,
+                gen_samples=args.gen_samples, interp_pairs=args.interp_pairs,
+                interp_steps=args.interp_steps)
         json.dump(output, open(args.out,"w"), indent=2)
         print(f"\nResults → {args.out}")
     main()
@@ -411,6 +540,12 @@ else:
             if "decoded_npz" in c:
                 output["clips"].setdefault(c["name"],{})["decoded_npz"]=c["decoded_npz"]
 
+        if not args.skip_phase3:
+            print("\n── Phase 3: Generative readiness (no Isaac) ────────────────")
+            output["gen_readiness"] = phase3(vae, clips, mean, std,
+                gen_samples=args.gen_samples, interp_pairs=args.interp_pairs,
+                interp_steps=args.interp_steps)
+
         print("\n── Phase 2: Tracking comparison ────────────────────────────")
         p2 = phase2_inside_hydra(clips, env_cfg, agent_cfg, args.artifacts_dir, args.eval_reps)
         for n,r in p2.items():
@@ -419,12 +554,15 @@ else:
         p0p = sum(1 for c in output["clips"].values() if c.get("phase0",{}).get("pass_joint_angle"))
         p2p = sum(1 for c in output["clips"].values() if c.get("phase2",{}).get("pass"))
         n   = len(output["clips"])
+        gen_ready = output.get("gen_readiness", {}).get("gen_ready")
         output["summary"] = {"n_clips":n,
             "phase0_joint_rmse_pass":f"{p0p}/{n}",
             "phase2_tracking_pass":  f"{p2p}/{n}",
+            "phase3_generative_ready": gen_ready,
             "overall_verdict":"PASS" if p0p==n and p2p>=max(1,int(n*0.8)) else "FAIL"}
         print(f"\n{'='*55}")
-        print(f"Phase 0: {p0p}/{n} | Phase 2: {p2p}/{n} | OVERALL: {output['summary']['overall_verdict']}")
+        print(f"Phase 0: {p0p}/{n} | Phase 2: {p2p}/{n} | Phase 3 gen-ready: {gen_ready} | "
+              f"OVERALL: {output['summary']['overall_verdict']}")
         json.dump(output, open(args.out,"w"), indent=2)
         print(f"Results → {args.out}")
 
