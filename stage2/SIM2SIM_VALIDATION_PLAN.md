@@ -51,3 +51,22 @@ Phase-0 RMSE, Phase-3 gen-readiness + standardization stats, and the framing for
 - Walk Isaac run: PID 3534754, log /tmp/simval_walk.log, out stage2/out/simval_walk.json.
 - Isaac is a machine-wide singleton → serialize. Idle GPUs: 1,2,4,5 (0,3 Blackwell, no torch).
 - If context compacts: read this file + stage2/out/simval_*.json to see what's done; continue.
+
+## OVERNIGHT TEACHER TRAINING (started ~20:10, after the 9-clip validation)
+The 9-clip validation found 3 FAIL clips, but their teachers were 6-10k partials (a confound:
+partial teachers may be fragile to a slightly-off decoded reference). To disentangle "fragile
+teacher" from "VAE genuinely fails this motion", training proper full-30k teachers for the 2 WORST:
+- GPU 1: fallAndGetUp (was 0.23) -> run_name fallAndGetUp1_subj1_full30k_v2, log /tmp/train_fall30k.log
+- GPU 4: fightAndSports1 (was 0.41) -> run_name fightSports1_subj1_full30k_v2, log /tmp/train_fightsports30k.log
+- GPU 5: kl1e-2 VAE still running (confirms KL plateau); GPU 2 idle.
+- fight1 (0.77) SKIPPED: persistent IsaacLab robot-USD generation race ("No contact sensors / no
+  rigid bodies") when a 3rd Isaac train starts while others run. Least-informative FAIL; not worth it.
+~1.2-1.4 s/iter -> 30k iters ~= 10-12h (won't finish in the 3h window; overnight job). Checkpoints
+land in logs/rsl_rl/g1_flat/<date>_fallAndGetUp1_subj1_full30k_v2/ and ..._fightSports1_..._v2/.
+
+### TO RE-VALIDATE on return (disentangle teacher vs VAE):
+Once these reach a high iter (ideally 30k, or >=20k), re-run the bench validation for those 2 clips
+with the NEW teachers (edit the teacher paths in stage2/run_simval_bench2.sh to the _v2 model_*.pt):
+  decoded survival JUMPS with the strong teacher  -> failure was teacher fragility (VAE is fine)
+  decoded survival STAYS low                       -> the VAE genuinely fails dynamic/contact motion
+That answer decides whether the VAE needs work on dynamic motion before the OmniMM handoff.
