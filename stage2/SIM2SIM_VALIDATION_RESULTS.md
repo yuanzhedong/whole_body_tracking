@@ -92,6 +92,26 @@ weight cannot normalize this latent** — the Phase-3 (A) gap must be handled by
 retraining. Sweep kept running to confirm the plateau holds at convergence / surface any late
 recon-vs-KL tradeoff; logs /tmp/kl_genready.log.
 
+## Disentanglement RESULT (2026-06-10): the failures are the VAE, not the teacher
+Trained full-30k teachers for the 2 worst FAIL clips and re-validated:
+
+| clip            | 10k teacher (orig→dec) | 30k teacher (orig→dec) | decoded change |
+|-----------------|:----------------------:|:----------------------:|:--------------:|
+| fallAndGetUp    | 0.97 → 0.22            | 0.95 → **0.305**       | +0.08 (still FAIL) |
+| fightAndSports1 | 1.00 → 0.41           | 0.98 → **0.469**       | +0.06 (still FAIL) |
+
+The 30k teacher tracks the ORIGINAL essentially perfectly (0.95–0.98) but STILL cannot track the
+DECODED motion — decoded survival rose only ~+0.07 despite 3× the teacher training. **Conclusion:
+the failures are NOT teacher fragility — the VAE genuinely fails to reconstruct dynamic/contact-rich
+motion (fighting, fall-and-get-up) well enough to be dynamically trackable.** A small part of the
+earlier gap was teacher quality (~+0.07), but the dominant factor is VAE reconstruction. And RMSE
+still doesn't see it (fallAndGetUp RMSE 0.255 ≈ dance1 0.260, yet 0.31 vs 0.88 decoded survival).
+
+→ Verdict for the handoff: the VAE is READY for locomotion + dance, but needs improvement on
+dynamic/contact motion (per-joint normalization, velocity/contact-aware loss, up-weight hard clips,
+or more dynamic data) before those motion types go into OmniMM. Measure any such fix with THIS
+sim2sim suite, not RMSE.
+
 ## Open / next
 - **Full-30k teachers for fight1 / fightAndSports1 / fallAndGetUp** — the single cleanest next
   experiment: disentangles "partial teacher is fragile" from "VAE genuinely can't reconstruct this
