@@ -145,3 +145,26 @@ EX_T4w_hardup (same arch as base). PREMATURE eval at ep~1k (vs base's ~15k) is c
   it used converged base@15k.)
 - PLAN: let EX_T4w_hardup train to ~10-12k epochs, then re-validate hard clips with the full-30k
   teachers AND report RMSE alongside survival. Only then is the up-weighting verdict meaningful.
+
+## Up-weight RESULT (2026-06-10, EX_T4w_hardup @ep6000 converged): IT WORKS
+Re-validated the converged up-weighted VAE vs base@15k, SAME full-30k teachers, survival + RMSE:
+
+| clip            | base@15k (orig→dec, ratio) | hardup@6k (orig→dec, ratio) | RMSE base→hardup | verdict |
+|-----------------|:--------------------------:|:---------------------------:|:----------------:|:-------:|
+| fightAndSports1 | 0.98→0.47 (0.48) ❌         | 1.00→0.92 (0.92) ✅          | 0.226→0.197      | FAIL→PASS |
+| sprint1         | 0.98→0.80 (0.82) ⚠️         | 0.98→0.91 (0.93) ✅          | 0.176→0.148      | marg→PASS |
+| fight1          | 0.96→0.74 (0.77) ❌         | 0.96→0.87 (0.90) ✅          | 0.225→0.180      | FAIL→PASS |
+| fallAndGetUp    | 0.95→0.31 (0.32) ❌         | 0.95→0.52 (0.54)            | 0.255→0.207      | big gain, still <0.90 |
+| walk (regress?) | 1.00→1.00                  | 1.00→1.00 ✅                 | 0.232→0.241      | held |
+
+**Up-weighting the 4 hard clips 4× (hard motion 46%→77%) moved 3/4 FAILs to PASS, ~doubled
+fallAndGetUp's survival (0.32→0.54), and did NOT regress walk.** This time RMSE AND survival both
+improved (they agree when the change is real reconstruction quality, not blandness). fallAndGetUp
+remains the hardest (ground-contact full-body recovery) — needs more (even heavier weight, capacity,
+or contact-aware loss).
+
+METHOD LESSON: the within-clip VAL RMSE (held-out windows) PLATEAUED by ep1300 and was flat to ep6k,
+but the FULL-CLIP reconstruction (train windows — what generate-then-track decodes) kept improving
+hugely (fallAndGetUp full-clip RMSE 0.319@ep1k → 0.207@ep6k). So val-RMSE is the WRONG progress
+monitor for this use; judge by full-clip reconstruction / sim2sim, and don't re-validate prematurely
+(my ep1k re-validation showed 0.06 and was simply under-trained on the full clip).
