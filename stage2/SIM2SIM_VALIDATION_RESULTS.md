@@ -129,3 +129,19 @@ sim2sim suite, not RMSE.
 `bash stage2/run_simval_bench.sh` (walk/run1/sprint1/dance1) and `bash stage2/run_simval_bench2.sh`
 (dance2/jumps1/fight1/fightAndSports1/fallAndGetUp), serial on GPU 1. Survival lines are
 `final survival = X` in the suite logs. Plan: stage2/SIM2SIM_VALIDATION_PLAN.md.
+
+## Up-weight-hard-clips experiment (EX_T4w_hardup) — IN PROGRESS + a metric caveat
+Built g1_dataset_T4within_hardup (4 hard clips ×4 → hard motion 46%→77% of windows), training
+EX_T4w_hardup (same arch as base). PREMATURE eval at ep~1k (vs base's ~15k) is confounded:
+- hardup@1k decoded survival: fallAndGetUp 0.06, fightAndSports1 0.03 (much worse) — but it's
+  far from converged (full-clip RMSE 0.319 vs base 0.255).
+- MATCHED-EPOCH check (base@1059 vs hardup@1020): base@1k gives 0.98 decoded on BOTH hard clips,
+  hardup@1k gives 0.03-0.06. So at equal epochs hardup is worse so far.
+- **CAVEAT discovered: decoded survival is gameable by blandness.** base@1k "survives" 0.98 but
+  base@15k only 0.31 on the SAME clip — because an under-trained VAE outputs near-mean, low-energy
+  motion that's trivial to track (high survival, low fidelity). As it converges it reconstructs the
+  real dynamic motion -> harder to track. So survival MUST be read alongside a fidelity/RMSE check,
+  and VAE-vs-VAE comparisons MUST be at matched convergence. (The 9-clip validation above is safe:
+  it used converged base@15k.)
+- PLAN: let EX_T4w_hardup train to ~10-12k epochs, then re-validate hard clips with the full-30k
+  teachers AND report RMSE alongside survival. Only then is the up-weighting verdict meaningful.
