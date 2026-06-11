@@ -46,6 +46,18 @@ class G1FlatRobustRefEnvCfg(G1FlatEnvCfg):
 
 
 @configclass
+class G1FlatRobustRefV2EnvCfg(G1FlatEnvCfg):
+    """Correlated reference-noise variant: a per-EPISODE per-joint bias (±0.15, constant within an
+    episode) on the reference, matching the VAE's consistent reconstruction offset — instead of the
+    ±0.3 per-step jitter of RobustRef-v0 (which over-penalized precise motion and slowed convergence).
+    UNIFORM recipe, no per-clip weights."""
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.commands.motion.ref_bias_scale = 0.15
+
+
+@configclass
 class G1FlatWoStateEstimationEnvCfg(G1FlatEnvCfg):
     def __post_init__(self):
         super().__post_init__()
