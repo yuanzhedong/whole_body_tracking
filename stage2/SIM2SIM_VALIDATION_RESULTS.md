@@ -182,3 +182,9 @@ is now sim2sim-validated-trackable for 8/9 LAFAN clips — a strong position for
 The remaining work is fallAndGetUp specifically. RECOMMENDED handoff VAE for locomotion+dance+fight:
 EX_T4w_hardup (re-check its Phase-3 gen-readiness, since heavy up-weighting may have tightened the
 latent around the hard clips).
+
+## Phase-3 gen-readiness of EX_T4w_hardup: unchanged from base (up-weighting didn't hurt it)
+(A) aggStd 1.71 / aggMu 0.37 (base 1.68 / 0.65) — same FAIL, same fix (ship standardization stats);
+(B) prior-sample decode PASS (in-dist 0.999, joint-valid); (C) interpolation PASS. So EX_T4w_hardup
+is STRICTLY BETTER than base for the OmniMM handoff: much better dynamic-motion trackability, no loss
+of generative readiness. → Recommended handoff VAE: EX_T4w_hardup.
