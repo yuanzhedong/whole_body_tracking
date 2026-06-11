@@ -10,6 +10,24 @@ blocks = [
         "Clean pipeline, **no per-clip weights**: (1) a survival GATE per motion → (2) keep only "
         "gate-passing teachers → (3) train ONE uniform VAE on that subset → (4) sim2sim with the "
         "gated teachers. Goal: measure VAE quality with the teacher confound removed.")),
+
+    wr.H2(text="Experiment log — BASELINE + everything tried (comparable)"),
+    wr.MarkdownBlock(text=(
+        "**Fixed eval protocol** (every row comparable): 8 gated clips, FROZEN gate-passing teachers, "
+        "no-reset decoded survival (128 envs). Swap the VAE checkpoint only.\n\n"
+        "**BASELINE = EX_gated8** (latent128, KL5e-5, smooth-L1 + velocity(0.5) loss, 10k ep): "
+        "**4/8 PASS** — walk 1.00, run1 0.99, dance2 0.96, dance1 0.87 pass; sprint1 0.70, fight1 0.76, "
+        "fightAndSports1 0.41, fallAndGetUp 0.16 fail.\n\n"
+        "| VAE variant | delta from baseline | hard decoded (sprint/fight/fAS/fall) | status |\n"
+        "|---|---|---|---|\n"
+        "| EX_gated8 (BASELINE) | — | 0.70 / 0.76 / 0.41 / 0.16 | done |\n"
+        "| EX_gated8_dyn | velocity 0.5→1.0, accel 0→1.0 | pending | training |\n"
+        "| EX_gated8_mir | mirror aug (2× data) | pending | training |\n"
+        "| EX_T4w_hardup | hard clips ×4 (per-clip weight HACK) | 0.91/0.87/0.92/0.69 (re-eval pending) | helps |\n"
+        "| EX_T4w_kl{1e-4..1e-2} | KL sweep | n/a | NEGATIVE (KL can't normalize latent) |\n\n"
+        "Teacher variants: robust-v2 (±0.15 correlated ref bias) lifts decoded fallAndGetUp 0.16→0.30, "
+        "fightAndSports1 0.41→0.57. Full traceable log: stage2/EXPERIMENT_LOG.md.")),
+
     wr.H2(text="Stage-1 survival gate (original survival ≥ 0.95)"),
     wr.MarkdownBlock(text=(
         "| clip | original survival | gate |\n|---|---|---|\n"
@@ -54,9 +72,17 @@ blocks = [
         "4. **Tighten survival metric:** 256+ envs / 2–3 reps.")),
 ]
 
-report = wr.Report(entity=ENTITY, project=PROJECT,
-                   title="Gated pipeline: stage-1 survival gate + uniform VAE sim2sim",
-                   description="Clean gated stage-1 -> uniform VAE -> sim2sim. Confound-free VAE quality.",
-                   blocks=blocks)
+# Update the existing report in place (same URL) if it exists, else create.
+URL = ("https://wandb.ai/cs224n-robustqa/g1-vae-ablation/reports/"
+       "Gated-pipeline:-stage-1-survival-gate-+-uniform-VAE-sim2sim--VmlldzoxNzE5NTQ2Ng==")
+try:
+    report = wr.Report.from_url(URL)
+    report.blocks = blocks
+except Exception as e:
+    print(f"[warn] new report ({e})")
+    report = wr.Report(entity=ENTITY, project=PROJECT,
+                       title="Gated pipeline: stage-1 survival gate + uniform VAE sim2sim",
+                       description="Clean gated stage-1 -> uniform VAE -> sim2sim. Confound-free VAE quality.",
+                       blocks=blocks)
 report.save()
 print("REPORT_URL:", report.url)
