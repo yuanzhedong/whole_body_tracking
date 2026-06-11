@@ -1,4 +1,5 @@
 from isaaclab.utils import configclass
+from isaaclab.utils.noise import AdditiveUniformNoiseCfg as Unoise
 
 from whole_body_tracking.robots.g1 import G1_ACTION_SCALE, G1_CYLINDER_CFG
 from whole_body_tracking.tasks.tracking.config.g1.agents.rsl_rl_ppo_cfg import LOW_FREQ_SCALE
@@ -29,6 +30,19 @@ class G1FlatEnvCfg(TrackingEnvCfg):
             "right_elbow_link",
             "right_wrist_yaw_link",
         ]
+
+
+@configclass
+class G1FlatRobustRefEnvCfg(G1FlatEnvCfg):
+    """Reference-robust tracking: inject noise into the reference `command` obs
+    (target [joint_pos | joint_vel]) so the policy learns to track an IMPERFECT reference —
+    exactly the kind a VAE/diffusion produces (decoded joint_pos error ~0.2 rad). UNIFORM recipe
+    (same for every motion, no per-clip weights). The goal is a wider competence basin so the
+    policy stays upright even when the reference is dynamically inconsistent."""
+
+    def __post_init__(self):
+        super().__post_init__()
+        self.observations.policy.command.noise = Unoise(n_min=-0.3, n_max=0.3)
 
 
 @configclass
