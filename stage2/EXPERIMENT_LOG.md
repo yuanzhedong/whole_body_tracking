@@ -110,3 +110,25 @@ the up-weighting hack, no per-clip weights. Our [1,128] bottleneck was limiting.
 to novel motion, not reconstruction of training clips). Per the within-clip RMSE→survival link,
 lat256 should give hardup-like sim2sim survival on hard clips — sim2sim eval pending.
 RECOMMENDATION forming: replace the up-weight hack with latent[1,256] + more data; consider [1,512].
+
+## Variant sim2sim survival (decoded, gated teachers) — only CAPACITY helps; data/loss DILUTE at fixed [1,128]
+| variant | sprint1 | fight1 | fightAndSports1 | fallAndGetUp | vs baseline |
+|---------|:---:|:---:|:---:|:---:|---|
+| EX_gated8 baseline | 0.70 | 0.76 | 0.41 | 0.16 | — |
+| EX_gated8_dyn | 0.74 | 0.81 | 0.11 | 0.04 | WORSE (dynamics loss hurts) |
+| EX_gated8_mir | 0.75 | 0.73 | 0.28 | 0.02 | WORSE (mirror dilutes capacity) |
+| EX_gated8_dynmir | 0.72 | 0.88 | 0.28 | 0.02 | WORSE |
+| EX_gated8_lat256 | pending (RMSE 0.185 best → expect best survival) |
+CRUCIAL INSIGHT: at fixed latent[1,128] (1 token, 128-dim), the VAE is CAPACITY-LIMITED. Adding data
+(mirror 2x) or losses (dyn) just splits/reallocates the limited capacity -> WORSE reconstruction of
+the originals -> worse survival. INCREASING capacity (lat256) is the only lever that helped.
+=> More data MUST come with more capacity, else it dilutes. AMASS experiments must use latent>=256.
+
+## DATA AVAILABILITY (2026-06-11)
+- More LAFAN: NONE readily available. HF repo fleaven/Retargeted_AMASS_for_robotics has 0 LAFAN; our
+  9 LAFAN clips came from a separate source (/tmp/lafan_suite) not expandable here without raw LAFAN1 BVH.
+- AMASS: 17,717 G1-RETARGETED clips available NOW via that HF repo (no manual retargeting!): KIT 4164,
+  BioMotionLab 3031, CMU 1978, GRAB 1340, BMLhandball 634, ACCAD 230, MOYO 229, DanceDB 111, SFU 32...
+  Pipeline: hf .npy -> retargeting/hf_to_csv.py -> CSV -> csv_to_npz.py -> export_g1_motion.py -> 41-D.
+PLAN: pull a dynamic AMASS subset (CMU/ACCAD/DanceDB/handball/MOYO) -> features -> bigger corpus ->
+retrain BASELINE(128) + lat256 on SAME corpus (fair) -> eval on the 8 gated clips. Capacity scales with data.
