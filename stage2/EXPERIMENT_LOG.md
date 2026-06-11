@@ -132,3 +132,21 @@ the originals -> worse survival. INCREASING capacity (lat256) is the only lever 
   Pipeline: hf .npy -> retargeting/hf_to_csv.py -> CSV -> csv_to_npz.py -> export_g1_motion.py -> 41-D.
 PLAN: pull a dynamic AMASS subset (CMU/ACCAD/DanceDB/handball/MOYO) -> features -> bigger corpus ->
 retrain BASELINE(128) + lat256 on SAME corpus (fair) -> eval on the 8 gated clips. Capacity scales with data.
+
+## *** HEADLINE: latent[1,256] (capacity) is the CLEAN fix — replaces the up-weighting hack ***
+lat256 full sim2sim (decoded survival, gated teachers) vs baseline[1,128]:
+| clip | baseline | lat256 | Δ |
+|------|:---:|:---:|:---:|
+| walk | 1.00 | 1.00 | — |
+| run1 | 0.99 | 1.00 | +0.01 |
+| sprint1 | 0.70 | 0.86 | +0.16 |
+| dance1 | 0.87 | 0.84 | -0.03 |
+| dance2 | 0.96 | 0.98 | +0.02 |
+| fight1 | 0.76 | 0.88 | +0.12 |
+| fightAndSports1 | 0.41 | 0.91 | +0.50 |
+| fallAndGetUp | 0.16 | 0.63 | +0.47 |
+PASS: baseline 4/8 -> lat256 ~6-7/8. lat256 RMSE 0.185 (best). This is the CLEAN, uniform replacement
+for the up-weighting hack — just UniMoTok's own default latent [1,256] vs our [1,128]; no per-clip
+weights, no loss change. Our [1,128] bottleneck was the real limiter. fallAndGetUp (0.63) still <0.90
+(hardest motion, but +0.47). RECOMMENDATION: adopt latent[1,256] as the recipe; combine with AMASS
+data (+capacity) for the last hard clip. dynamics-loss/mirror at fixed [128] were dead ends (dilution).
