@@ -71,3 +71,25 @@ Notes:
 ## TODO for a fully-comparable table
 Re-eval EX_T4w_base + EX_T4w_hardup with the gated-protocol teachers; eval EX_gated8_dyn + _mir when
 trained. Then every row uses identical teachers/clips/metric.
+
+## Paper-metric reconstruction (joint-angle RMSE rad; paper biomech target < 0.10)
+Computed with stage2/paper_metrics.py (no Isaac). NOTE on setup validation: paper-number REPRODUCTION
+is blocked (their AMASS/HumanML3D datasets are absent — /simurgh2 cluster paths gone). Setup confirmed
+correct instead via: smoke overfit PASS (synthetic recon 0.236→0.045), reconstruction improving with
+data/epochs, and arch/loss/normalization matching the paper config. Our gap to <0.10 = data starvation
+(8 clips vs their tens of thousands) + latent[1,128] vs their [1,256], NOT bugs.
+
+| VAE | mean jointRMSE | sprint1 | fightAndSports1 | fallAndGetUp | sim2sim hard-clip survival |
+|-----|:----:|:----:|:----:|:----:|:----:|
+| EX_T4w_base (9clip) | 0.230 | 0.176 | 0.225 | 0.252 | 0.82/0.41/0.23 (old teachers) |
+| EX_gated8 (BASELINE) | 0.233 | 0.179 | 0.230 | 0.256 | 0.70/0.41/0.16 (gated) |
+| EX_T4w_hardup (upweight) | **0.197** | **0.131** | **0.182** | **0.183** | 0.91/0.92/0.69 (full30k) |
+| EX_gated8_dyn / _mir / _lat256 / _dynmir | pending | | | | training |
+
+KEY RECONCILIATION: across clips, RMSE does NOT predict survival (sprint has lowest RMSE but fails —
+motion difficulty varies). But WITHIN a clip, across VAEs, lower RMSE DOES predict higher survival
+(hardup drove fallAndGetUp RMSE 0.256→0.183 and survival 0.16→0.69). So the fall-analysis caveat is:
+MARGINAL average-RMSE reduction doesn't help, but SUBSTANTIALLY lowering a hard clip's RMSE does.
+The hard clips need RMSE pushed well below ~0.20 to start passing — which up-weighting/capacity/data/
+dynamics-loss all aim at. Per-group: waist reconstructs best (~0.06, root-orient weight working),
+arms worst (~0.25), legs mid (~0.22).
