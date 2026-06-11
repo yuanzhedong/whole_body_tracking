@@ -70,3 +70,30 @@ with the NEW teachers (edit the teacher paths in stage2/run_simval_bench2.sh to 
   decoded survival JUMPS with the strong teacher  -> failure was teacher fragility (VAE is fine)
   decoded survival STAYS low                       -> the VAE genuinely fails dynamic/contact motion
 That answer decides whether the VAE needs work on dynamic motion before the OmniMM handoff.
+
+## VAE IMPROVEMENT: up-weight hard clips (started 2026-06-10 ~09:28)
+Goal: fix the dynamic/contact-motion failures (the VAE genuinely can't reconstruct them — see
+disentanglement). Approach: oversample the 4 hard clips (fallAndGetUp, fightAndSports1, fight1,
+sprint1) 4x in the training set → hard motion 46%→77% of windows. Zero code change (data module
+windows every train/*.npz uniformly; duplicating files = up-weighting).
+- Dataset: stage2/out/g1_dataset_T4within_hardup (21 train files; T4within norm + val reused).
+- Config: /tmp/cfg_EX_T4w_hardup.yaml (clone of EX_T4w_base; latent128, KL5e-5, 12000 epochs).
+- Run: EX_T4w_hardup on GPU1, log /tmp/train_hardup.log, ckpts in
+  UniMoTok/experiments/biomechanics_tokenizer/EX_T4w_hardup/checkpoints/.
+- EVALUATE (the test): re-run sim2sim on the hard clips with this VAE vs EX_T4w_base, SAME teachers
+  (fallAndGetUp + fightAndSports1 now have full-30k _v2 teachers; sprint1 has full-30k; fight1 10k).
+  Edit VAE path in run_simval_bench.sh/bench2.sh to EX_T4w_hardup/checkpoints/<latest full ckpt>.
+  Baseline to beat (EX_T4w_base, 30k teachers): fallAndGetUp dec 0.305, fightAndSports1 dec 0.469,
+  sprint1 dec 0.797. WATCH the easy clips don't regress badly (walk/run1/dance were 0.88-1.00).
+
+## ROBUST-POLICY EXPERIMENT (2026-06-10 ~18:00) — isolate stage-1 RL vs VAE
+Hypothesis: the dynamic-motion failures are partly the short/single-clip stage-1 policy being
+brittle to an imperfect (decoded) reference — not only VAE error. Test: train policies with the
+UNIFORM Tracking-Flat-G1-RobustRef-v0 recipe (Unoise±0.3 on the reference command obs; no per-clip
+weights), then track the BASE (un-up-weighted EX_T4w_base) decoded motion. Compare to non-robust
+baseline decoded survival.
+Fleet (all 30k, ~11h): fallAndGetUp GPU4 (beat 0.31), fightAndSports1 GPU2 (0.47), fight1 GPU5 (0.74),
+sprint1 GPU1 (0.80). Logs /tmp/train_rr_*.log (+ /tmp/train_robustref.log for fallAndGetUp).
+EVALUATE at matched iters: track base-decoded with robust@N vs baseline@N. base decoded npzs in
+stage2/out/g1_simval_<tag>/p01_decoded/ and g1_reval_*/. If robust >> baseline -> stage-1 was the
+issue, up-weighting unnecessary, RobustRef is the clean stage-1 recipe.
