@@ -18,6 +18,7 @@ p.add_argument("--teacher_ckpt",default=f"{WBT}/logs/rsl_rl/g1_flat/2026-05-30_1
 p.add_argument("--motion",default=f"{WBT}/stage2/out/sim2sim_et_decoded/walk1_subject1_0_33_decoded.npz")
 p.add_argument("--steps",type=int,default=200)
 p.add_argument("--no_freeze",action="store_true")
+p.add_argument("--log_falls",default="",help="if set, save per-env first-fall step + per-step new-fall counts to this npz")
 p.add_argument("--keep_resets",action="store_true",help="keep fall-terminations ON (reset-on-fall) to measure reset overhead")
 p.add_argument("--late",action="store_true",help="use the LATE (normal) threshold instead of early")
 cli_args.add_rsl_rl_args(p); AppLauncher.add_app_launcher_args(p)
@@ -47,6 +48,8 @@ def main(env_cfg,agent_cfg):
     mode = ("LATE" if args.late else "EARLY") + (" no-freeze" if args.no_freeze else " +freeze")
     log(f"\n=== EARLY-FREEZE TEST [{mode}] thresh pos>{pos_th} ori>{ori_th}, {args.num_envs} envs ===")
     ever=torch.zeros(args.num_envs,dtype=torch.bool,device=dev)
+    fall_step=torch.full((args.num_envs,),-1,dtype=torch.long,device=dev)
+    new_fall_per_step=[]
     obs,_=env.get_observations()
     win=20; t_acc=0.0; n_in=0
     for s in range(args.steps):
@@ -59,6 +62,7 @@ def main(env_cfg,agent_cfg):
         torch.cuda.synchronize(); t_acc+=(time.time()-t0)*1000; n_in+=1
         fail=(T.bad_anchor_pos_z_only(uenv,"motion",pos_th)|T.bad_anchor_ori(uenv,rc,"motion",ori_th))
         prev=ever.clone(); ever|=fail
+        newly=ever&~prev; fall_step[newly]=s; new_fall_per_step.append(int(newly.sum()))
         if not args.no_freeze:
             nids=torch.where(ever&~prev)[0]
             if nids.numel()>0:
@@ -70,5 +74,12 @@ def main(env_cfg,agent_cfg):
             log(f"  steps {s-win+2:3d}-{s+1:3d}: {t_acc/n_in:7.1f} ms/step   failed={int(ever.sum()):3d}/{args.num_envs}")
             t_acc=0.0; n_in=0
     log(f"  final survival = {float((~ever).float().mean()):.3f}")
+    if args.log_falls:
+        import numpy as _np
+        fs=fall_step.cpu().numpy()
+        _np.savez(args.log_falls, fall_step=fs, new_fall_per_step=_np.array(new_fall_per_step))
+        fell=fs[fs>=0]
+        if len(fell): log(f"  falls: n={len(fell)} median_frame={int(_np.median(fell))} p25={int(_np.percentile(fell,25))} p75={int(_np.percentile(fell,75))}")
+        log(f"  saved fall log -> {args.log_falls}")
     env.close()
 if __name__=="__main__": main(); app.close()

@@ -64,3 +64,19 @@ which already passed 3/4 hard clips) + the per-dim latent-standardization stats.
 
 Artifacts: stage2/out/gate_check.log, stage2/out/gated_sim2sim.log, run_gate_check.sh,
 run_gated_sim2sim.sh. VAE: UniMoTok/.../EX_gated8/checkpoints/epoch=9599.ckpt.
+
+## Per-frame fall analysis (2026-06-11) — OVERTURNS the "error-spike" hypothesis
+Instrumented the eval to log each env's fall frame (bench_earlyfreeze --log_falls). Decoded motion
+(gated VAE) + gated teacher:
+- fallAndGetUp: 128/128 fall, median frame 101; 68% of falls in frames 0-150. pos err there ~0.07
+  (clip-mean 0.172, ratio 0.46), vel err ~0.08 (mean 0.90, ratio 0.09). Highest error is LATER
+  (frames 250-500, pos 0.20-0.24) — never reached.
+- fightAndSports1: 98/128 fall, median 214; pre-fall pos err 0.093 (mean 0.134, 0.69x).
+FINDING: robots fall where reconstruction error is BELOW average, NOT at error spikes. Falls cluster
+at dynamically low-margin phases (fallAndGetUp's violent controlled descent, frames 50-150) where a
+SMALL decoded error (~0.07 rad) is unrecoverable even though original tracking survives there (0.95).
+IMPLICATION: it's the motion's margin at that instant, not the error magnitude. Lowering average RMSE
+won't fix it; the decoded motion must be dynamically EXECUTABLE at the critical phase (why up-weighting
+worked, why the 0.10-rad target is the wrong goal). Hardest motions likely need a near-exact VAE on
+those phases AND a wider-basin (robust) policy. Tools: bench_earlyfreeze.py --log_falls,
+/tmp/falls_*.npz.
