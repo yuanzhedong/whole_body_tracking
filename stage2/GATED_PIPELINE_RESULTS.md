@@ -80,3 +80,18 @@ won't fix it; the decoded motion must be dynamically EXECUTABLE at the critical 
 worked, why the 0.10-rad target is the wrong goal). Hardest motions likely need a near-exact VAE on
 those phases AND a wider-basin (robust) policy. Tools: bench_earlyfreeze.py --log_falls,
 /tmp/falls_*.npz.
+
+## Robust-v2 teacher test + jumps1 recovery (2026-06-11)
+Robust-v2 = correlated per-episode ±0.15 reference bias (G1FlatRobustRefV2). Tracking the gated-VAE
+decoded motion with robust-v2 teachers vs the non-robust baseline:
+| clip | orig (robust-v2) | decoded (robust-v2) | decoded (non-robust baseline) |
+|------|:----:|:----:|:----:|
+| fallAndGetUp    | 0.82 | 0.297 | 0.164 |
+| fightAndSports1 | 0.98 | 0.570 | 0.406 |
+Robust-v2 lifts decoded survival for BOTH (+0.13, +0.16). Nearly free for fightAndSports1 (orig 0.98);
+costs original for the precise fallAndGetUp (orig 0.95→0.82, ±0.15 still a bit high for it). Confirms
+the fall-analysis conclusion: the hardest motions need BOTH a robust policy AND a better VAE.
+jumps1 gated teacher trained to 14k now passes the gate (original survival 1.000, was 0.914 @6k) →
+a 9th clip is available for a future 9-clip gated VAE.
+NEXT: dynamics-aware-loss VAE (EX_gated8_dyn: LAMBDA_VELOCITY 1.0, LAMBDA_ACCELERATION 1.0 — both were
+off/low; UniMoTok's framework supports them) training on GPU1 to test improvement #1.
