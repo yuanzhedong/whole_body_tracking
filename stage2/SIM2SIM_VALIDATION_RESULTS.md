@@ -168,3 +168,17 @@ but the FULL-CLIP reconstruction (train windows — what generate-then-track dec
 hugely (fallAndGetUp full-clip RMSE 0.319@ep1k → 0.207@ep6k). So val-RMSE is the WRONG progress
 monitor for this use; judge by full-clip reconstruction / sim2sim, and don't re-validate prematurely
 (my ep1k re-validation showed 0.06 and was simply under-trained on the full clip).
+
+## fallAndGetUp keeps climbing with training (the one hard holdout)
+fallAndGetUp decoded survival vs training: base@15k 0.31 → hardup@6k 0.52 → hardup@10.6k 0.69
+(RMSE 0.255 → 0.207 → 0.190; ORIGINAL ~0.96). Steadily improving (ratio now 0.69/0.97=0.71), still
+below 0.90 — it's the hardest motion (full-body ground recovery). More epochs and/or heavier weight
+should push it further; if it plateaus <0.90, add latent capacity or a contact-aware loss for it.
+
+## FINAL up-weight verdict
+Up-weighting the hard clips fixed the dynamic-motion gap for 3/4 clips (fightAndSports1, sprint1,
+fight1 now PASS) with no walk regression, and roughly doubled fallAndGetUp (still climbing). The VAE
+is now sim2sim-validated-trackable for 8/9 LAFAN clips — a strong position for the OmniMM handoff.
+The remaining work is fallAndGetUp specifically. RECOMMENDED handoff VAE for locomotion+dance+fight:
+EX_T4w_hardup (re-check its Phase-3 gen-readiness, since heavy up-weighting may have tightened the
+latent around the hard clips).
