@@ -93,3 +93,20 @@ MARGINAL average-RMSE reduction doesn't help, but SUBSTANTIALLY lowering a hard 
 The hard clips need RMSE pushed well below ~0.20 to start passing — which up-weighting/capacity/data/
 dynamics-loss all aim at. Per-group: waist reconstructs best (~0.06, root-orient weight working),
 arms worst (~0.25), legs mid (~0.22).
+
+## Paper-metric results for ALL variants (joint RMSE rad) — CAPACITY WINS
+| VAE | latent | loss/data delta | mean jointRMSE | hard clips (sprint/fAS/fall) |
+|-----|:------:|-----------------|:----:|:----:|
+| EX_gated8 (baseline) | [1,128] | — | 0.233 | 0.179/0.230/0.256 |
+| EX_gated8_dyn | [1,128] | velocity1.0+accel1.0 | 0.272 (WORSE) | 0.194/0.271/0.326 |
+| EX_gated8_mir | [1,128] | mirror 2× data | 0.241 (~neutral) | 0.182/0.239/0.264 |
+| EX_gated8_dynmir | [1,128] | dyn+mirror | 0.267 (worse) | 0.195/0.266/0.310 |
+| EX_T4w_hardup | [1,128] | hard clips ×4 (HACK) | 0.197 | 0.131/0.182/0.183 |
+| **EX_gated8_lat256** | **[1,256]** | **capacity only** | **0.185 (BEST)** | **0.144/0.190/0.192** |
+
+CONCLUSION: latent[1,256] (UniMoTok's own default) is the CLEAN uniform winner — lowest RMSE, beats
+the up-weighting hack, no per-clip weights. Our [1,128] bottleneck was limiting. Dynamics loss HURTS
+(trades position for velocity/accel accuracy). Mirror is neutral in-corpus (would help generalization
+to novel motion, not reconstruction of training clips). Per the within-clip RMSE→survival link,
+lat256 should give hardup-like sim2sim survival on hard clips — sim2sim eval pending.
+RECOMMENDATION forming: replace the up-weight hack with latent[1,256] + more data; consider [1,512].
