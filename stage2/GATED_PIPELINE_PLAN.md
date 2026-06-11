@@ -47,3 +47,14 @@ PHASE 5: write stage2/GATED_PIPELINE_RESULTS.md + recommendation.
 
 ## State for restart (if compacted)
 Read this file + stage2/out/gate_check.log (Phase 1 table) + GATED_PIPELINE_RESULTS.md.
+
+## EXECUTION STATE (2026-06-11 ~00:20)
+Gate-check DONE (stage2/out/gate_check.log): 8/9 pass original survival>=0.95; jumps1 fails (0.914, 6k).
+SUBSET = 8 clips (exclude jumps1): walk run1 sprint1 dance1 dance2 fight1 fightAndSports1 fallAndGetUp.
+Dataset: stage2/out/g1_dataset_gated8 (T4within subset + reused norm). VAE: EX_gated8, /tmp/cfg_EX_gated8.yaml,
+log /tmp/train_gated8.log, ckpts UniMoTok/experiments/biomechanics_tokenizer/EX_gated8/checkpoints/, 10k epochs ~2h.
+GPU fleet: 1=VAE EX_gated8; 2=jumps1_gated teacher (recover); 4=fallgetup_rrv2 (robust-v2 teacher);
+5=fightsports_rrv2 (robust-v2). Teachers for sim2sim eval = the gate-check teachers (gate_check.log paths).
+TODO when VAE done: (1) sim2sim eval all 8 clips w/ gated teachers (decode w/ EX_gated8, track, survival+RMSE);
+(2) W&B report for results + UPDATE ROOT/MASTER report (create_root_report.py); (3) analyze bugs/improvements;
+(4) ping user. Compare to EX_T4w_base (9-clip) sim2sim. jumps1 teacher (12k) lets us add jumps1 later.
