@@ -174,3 +174,24 @@ CONFOUND: cross-convention survivals differ at same RMSE (FK lat256 fightAndSpor
 FK fallGetUp 0.63 vs raw 0.52) -> raw-root vs FK-root changes decoded joints via the shared latent. So
 only compare WITHIN convention. raw8 baselines (training) give the clean raw-to-raw data comparison.
 NEXT: EX_laA_lat512 (12.1h corpus, latent512) launched on GPU1 = max capacity+data.
+
+## *** CLEANEST RESULT: capacity dominant; more data DILUTES at fixed capacity ***
+Full raw-to-raw (same 8 eval clips, raw-root, only latent differs):
+| clip | raw8 lat128 | raw8 lat256 | LAFAN1-40 lat256 | LAFAN1-40 lat128 |
+|------|:---:|:---:|:---:|:---:|
+| walk | 1.00 | 1.00 | 1.00 | 1.00 |
+| run1 | 0.99 | 1.00 | 1.00 | 0.99 |
+| sprint1 | 0.82 | 0.98 | 0.95 | 0.97 |
+| dance1 | 0.67 | 0.87 | 0.875 | 0.70 |
+| dance2 | 0.98 | 0.98 | 0.99 | 0.98 |
+| fight1 | 0.83 | 0.83 | 0.94 | 0.96 |
+| fightAndSports1 | 0.38 | 0.945 | 0.48 | 0.36 |
+| fallAndGetUp | 0.27 | 0.72 | 0.52 | 0.13 |
+| PASS | ~3/8 | **7/8** | 6/8 | ~4/8 |
+FINDINGS (clean, within raw-root):
+1. CAPACITY [128->256] is the DOMINANT lever: same 8 clips, fightAndSports1 0.38->0.945, fallAndGetUp 0.27->0.72.
+2. raw8_lat256 = 7/8 (BEST), fallAndGetUp 0.72 (best anywhere). fewer targeted clips + capacity > more data.
+3. MORE DATA DILUTES at fixed capacity: 8clips->40clips at lat256 HURT the eval clips (fallGetUp 0.72->0.52,
+   fightAndSports 0.945->0.48) because the 40-set has 6 fall + multiple fight variants splitting lat256's bottleneck.
+=> For the SPECIFIC eval clips, capacity concentrated on them wins. Large corpus helps GENERALIZATION/diffusion
+   latent, NOT the specific clips, unless capacity scales with it (testing laA lat256/512 on 12.1h corpus).
