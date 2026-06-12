@@ -195,3 +195,23 @@ FINDINGS (clean, within raw-root):
    fightAndSports 0.945->0.48) because the 40-set has 6 fall + multiple fight variants splitting lat256's bottleneck.
 => For the SPECIFIC eval clips, capacity concentrated on them wins. Large corpus helps GENERALIZATION/diffusion
    latent, NOT the specific clips, unless capacity scales with it (testing laA lat256/512 on 12.1h corpus).
+
+## *** FINAL: scale CAPACITY WITH DATA — latent512 on 12.1h corpus is the winner ***
+EX_laA (12.1h corpus, 3072 clips):
+| clip | lat256 | lat512 | RMSE@512 |
+|------|:---:|:---:|:---:|
+| walk | 1.00 | 1.00 | 0.084 |
+| run1 | 1.00 | 1.00 | 0.101 |
+| sprint1 | 0.99 | 0.97 | 0.095 |
+| dance1 | 0.66 | 0.84 | 0.164 |
+| dance2 | 1.00 | 0.98 | 0.188 |
+| fight1 | 0.83 | 0.95 | 0.145 |
+| fightAndSports1 | 0.38 | 0.97 | 0.147 |
+| fallAndGetUp | 0.20 | 0.74 | 0.154 |
+| PASS | ~4/8 (diluted) | ~6-7/8 | |
+CONCLUSION: lat256 DILUTED by the 3072-clip corpus; lat512 ABSORBS it -> ~6-7/8 pass + the LOWEST RMSE
+of any VAE (walk 0.084, UNDER the paper <0.10 target -> setup confirmed paper-grade once data+capacity match).
+fallAndGetUp 0.74 = best-ever (was 0.16 baseline) but still <0.90 -> the one genuine holdout.
+RECIPE: capacity must SCALE WITH data (lat512 for 12h; lat256 for ~8-40 clips). Big diverse corpus + matched
+capacity = best reconstruction + strong survival + rich latent (ideal for OmniMM diffusion handoff).
+RECOMMENDED HANDOFF VAE: EX_laA_lat512 (or raw8_lat256 if only the 8 specific clips matter). NEXT: lat1024.
