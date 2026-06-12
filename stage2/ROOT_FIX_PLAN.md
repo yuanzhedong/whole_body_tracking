@@ -13,3 +13,10 @@ INCREMENTAL LADDER (user wants small steps, scale data gradually, download in pa
   step2: g1_dataset_lafan1 (40 LAFAN1, raw) x {lat128, lat256} -- does full same-distribution LAFAN help?
   step3: + AMASS (as it downloads) x {lat256, lat512} -- scale capacity with data.
 EVAL: run_gated_sim2sim_raw.sh (raw-root clip source + corpus norm). Gated teachers unchanged.
+
+## GPU QUEUE (launch as GPUs free; user wants regular free-GPU checks)
+Running: EX_lafan1_lat256(G1) EX_lafan1_lat128(G4) EX_raw8_lat256(G2) EX_raw8_lat128(G5).
+QUEUE (priority): (1) EVAL finished VAEs via run_gated_sim2sim_raw.sh (VAE_EXP=<exp> NORM_DIR=<corpus> EVAL_GPU=<n>);
+(2) EX_lafan1_lat512 (capacity scaling on LAFAN1); (3) when AMASS-10h done: EX_lafan1amass_lat256/lat512 on
+g1_dataset_lafan1+amass (build via lafan1_feats + amass_feats, raw-root, recompute norm).
+Corpora: g1_dataset_raw8 (8 eval clips), g1_dataset_lafan1 (40), [+amass]. Eval clips raw in lafan1_feats.
