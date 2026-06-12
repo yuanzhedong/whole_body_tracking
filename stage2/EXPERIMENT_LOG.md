@@ -150,3 +150,18 @@ for the up-weighting hack — just UniMoTok's own default latent [1,256] vs our 
 weights, no loss change. Our [1,128] bottleneck was the real limiter. fallAndGetUp (0.63) still <0.90
 (hardest motion, but +0.47). RECOMMENDATION: adopt latent[1,256] as the recipe; combine with AMASS
 data (+capacity) for the last hard clip. dynamics-loss/mirror at fixed [128] were dead ends (dilution).
+
+## DATA SCALING (raw-root, incremental) — capacity & data are complementary
+Full LAFAN1 (40 clips, 2.1h) and AMASS-10h (3042 clips) fetched + converted (raw-root, joints verified).
+Corpora: g1_dataset_lafan1 (40), g1_dataset_lafan1_amass (3072 clips, 12.1h). Eval = run_gated_sim2sim_raw.sh.
+| VAE | corpus | latent | sprint1 | fight1 | dance1 | fightAndSports1 | fallAndGetUp |
+|-----|--------|:------:|:---:|:---:|:---:|:---:|:---:|
+| baseline (FK) | LAFAN-9 | 128 | 0.70 | 0.76 | 0.87 | 0.41 | 0.16 |
+| lat256 (FK) | LAFAN-9 | 256 | 0.86 | 0.88 | 0.84 | 0.91 | 0.63 |
+| EX_lafan1_lat128 | LAFAN1-40 | 128 | 0.97 | 0.96 | 0.70 | 0.36 | 0.13 |
+| EX_lafan1_lat256 | LAFAN1-40 | 256 | (training) |
+| EX_laA_lat256 | LAFAN1+AMASS 12.1h | 256 | (training, ~5h) STEP 3 |
+FINDING: more same-distribution data (LAFAN1) at lat128 HELPS sprint(0.70->0.97)/fight(0.76->0.96)
+but DILUTES dance1(0.87->0.70) and doesn't fix the worst (fightAndSports/fallAndGetUp) — not enough
+capacity to absorb 40 clips. Capacity[256] alone (LAFAN-9) already lifts all hard clips. So data+capacity
+are COMPLEMENTARY: need both. Testing lat256 on LAFAN1 + the 12.1h corpus. fallAndGetUp remains the holdout.
