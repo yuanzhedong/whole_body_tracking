@@ -165,3 +165,12 @@ FINDING: more same-distribution data (LAFAN1) at lat128 HELPS sprint(0.70->0.97)
 but DILUTES dance1(0.87->0.70) and doesn't fix the worst (fightAndSports/fallAndGetUp) — not enough
 capacity to absorb 40 clips. Capacity[256] alone (LAFAN-9) already lifts all hard clips. So data+capacity
 are COMPLEMENTARY: need both. Testing lat256 on LAFAN1 + the 12.1h corpus. fallAndGetUp remains the holdout.
+
+## LAFAN1 @ latent256 (raw) + convention-confound note
+EX_lafan1_lat256 (40 LAFAN1, lat256, raw): walk/run1 1.00, sprint1 0.95, dance1 0.875 (dilution FIXED
+by capacity), dance2 0.99, fight1 0.94, fightAndSports1 0.48, fallAndGetUp 0.52. 6/8 pass. LOWEST RMSE
+yet (walk 0.104, sprint 0.110). Capacity[256] fixed dance1's lat128 dilution -> data+capacity complementary CONFIRMED.
+CONFOUND: cross-convention survivals differ at same RMSE (FK lat256 fightAndSports 0.91 vs raw lat256 0.48;
+FK fallGetUp 0.63 vs raw 0.52) -> raw-root vs FK-root changes decoded joints via the shared latent. So
+only compare WITHIN convention. raw8 baselines (training) give the clean raw-to-raw data comparison.
+NEXT: EX_laA_lat512 (12.1h corpus, latent512) launched on GPU1 = max capacity+data.
