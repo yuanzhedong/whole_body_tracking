@@ -61,6 +61,6 @@ def test_integrate_position_recovers_smooth_trajectory():
     pos = np.stack([np.sin(t), 0.5 * np.cos(0.7 * t), 0.8 + 0.1 * t], axis=1)
     vel = np.gradient(pos, dt, axis=0)  # exactly what the forward map stores
     rec = integrate_position(vel, dt, pos0=pos[0])
-    # trapezoid inverting central-difference: small bounded error, not exact
+    # exact inverse of np.gradient -> near machine precision, no accumulated drift
     err = np.linalg.norm(rec - pos, axis=1).max()
-    assert err < 5e-3, f"position integration drift too large: {err:.4f} m"
+    assert err < 1e-9, f"position integration not exact: {err:.2e} m"

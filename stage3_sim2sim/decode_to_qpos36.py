@@ -111,8 +111,14 @@ def features_to_qpos36(feats, dt, root_pos0_zup=None, yaw0=0.0, double_yup=True)
 
     Returns ``qpos_36[T,36] = [root_pos(3), root_quat_wxyz(4), joints(29)]``.
     """
+    if root_pos0_zup is None:
+        root_pos0_zup = np.zeros(3)
+    # process_clip pre-converts z-up -> y-up before build_features(to_yup=True), a
+    # *double* basis change. Pre-multiply the seed by T_ZUP_TO_YUP so it lands in the
+    # correct (double-converted) working frame; the double_yup block then undoes it once.
+    seed = (T_ZUP_TO_YUP @ np.asarray(root_pos0_zup, float)) if double_yup else np.asarray(root_pos0_zup, float)
     root_pos, quat_xyzw, joints = invert_build_features(
-        feats, dt, to_yup=True, root_pos0=root_pos0_zup, yaw0=yaw0)
+        feats, dt, to_yup=True, root_pos0=seed, yaw0=yaw0)
     if double_yup:
         R = Rotation.from_quat(quat_xyzw).as_matrix()
         root_pos, R = _apply_basis(T_YUP_TO_ZUP, root_pos, R)

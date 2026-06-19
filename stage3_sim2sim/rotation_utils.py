@@ -80,17 +80,27 @@ def integrate_yaw(yaw_rate, dt, yaw0=0.0):
 
 
 def integrate_position(vel_w, dt, pos0):
-    """Trapezoidal integration of world velocity -> position, seeded at pos0[3].
+    """Exact inverse of the forward map's ``np.gradient(root_pos, dt, axis=0)``.
 
-    Inverts the forward map's ``np.gradient(root_pos, dt)`` up to integration
-    drift (which the round-trip tests quantify).
+    ``np.gradient`` uses a forward difference at frame 0 (``v0=(p1-p0)/dt``) and
+    central differences in the interior (``vk=(p[k+1]-p[k-1])/2dt``). Inverting
+    those exactly recovers position with no accumulated scheme-mismatch drift:
+
+        p[1]   = p[0] + v[0]*dt
+        p[k+1] = p[k-1] + 2*dt*v[k]   (k = 1 .. T-2)
+
+    (The even/odd index chains are tied together by p[0] and the p[1] seed, so
+    there is no sawtooth/drift — unlike trapezoid integration of central diffs.)
     """
     vel_w = np.asarray(vel_w, dtype=np.float64)
+    T = vel_w.shape[0]
     pos = np.zeros_like(vel_w)
     pos[0] = np.asarray(pos0, dtype=np.float64)
-    # trapezoid: pos[k] = pos[k-1] + 0.5*(v[k-1]+v[k])*dt
-    incr = 0.5 * (vel_w[:-1] + vel_w[1:]) * dt
-    pos[1:] = pos[0] + np.cumsum(incr, axis=0)
+    if T == 1:
+        return pos
+    pos[1] = pos[0] + vel_w[0] * dt
+    for k in range(1, T - 1):
+        pos[k + 1] = pos[k - 1] + 2.0 * dt * vel_w[k]
     return pos
 
 

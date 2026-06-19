@@ -72,6 +72,27 @@ def test_feature_space_roundtrip_realclips(capsys):
     assert lin < 5e-3, f"linear velocity drifted: {lin}"
 
 
+@pytest.mark.xfail(reason="upstream double-yup in process_clip corrupts integrated "
+                          "world-root height; sim2sim uses the hybrid (decoded joints "
+                          "+ original root) instead. Joints + tilt are exact.",
+                   strict=True)
+def test_absolute_root_height_recovered():
+    """KNOWN LIMITATION (documented): full-root reconstruction can't recover absolute
+    pelvis height because the dataset feature frame has up along -z (double basis
+    change), so yaw-reconstruction error leaks into height. Kept as an xfail to track
+    the upstream fix; sim2sim does not rely on this path."""
+    from stage3_sim2sim.decode_to_qpos36 import qpos36_to_features
+    from stage3_sim2sim.sim2sim import build_qpos36_from_artifact
+    arts = sorted(glob.glob("/scratch/user/yzdong/OMG-Data/raw/bones_seed/artifacts_seed_full/*walk*/motion.npz"))
+    if not arts:
+        pytest.skip("seed artifacts not present")
+    qpos_gt = build_qpos36_from_artifact(arts[0])
+    feats = qpos36_to_features(qpos_gt, 1 / 30)
+    qpos_rec = features_to_qpos36(feats, 1 / 30, root_pos0_zup=qpos_gt[0, :3])
+    n = min(len(qpos_rec), len(qpos_gt))
+    assert np.abs(qpos_rec[:n, 2] - qpos_gt[:n, 2]).max() < 0.05
+
+
 def test_root_drift_report(capsys):
     """Report integrated-root vs stored ground-truth root drift (y-up body_pos_w[:,0])."""
     drifts = []
