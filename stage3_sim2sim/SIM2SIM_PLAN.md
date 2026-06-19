@@ -29,10 +29,21 @@ BONES-SEED G1 motion → UniMoTok VAE → decode → HoloMotion tracker → MuJo
 
 Gates are stop-and-verify: do not proceed past a red gate.
 
-## Status
-- **Gate A — PASSED.** L0 (8 tests): joints recovered exactly; orientation ≤ 0.32°; root drift ≤ 1.1 mm
-  over a 128-frame window (synthetic smooth motion). Inverse math is faithful.
-- L1 / L2 / L3 — pending.
+## Status — pipeline CLOSED end-to-end (Gates A→D pass)
+- **Gate A — PASSED.** L0: joints exact, orientation ≤ 0.32°, root drift ≤ 1.1 mm (synthetic). Inverse faithful.
+- **L1 — PASSED.** Real clips: joints exact, tilt 2e-7, lin-vel 3.6e-9 (exact np.gradient inverse), root drift
+  mean 5 mm. KNOWN LIMITATION (strict xfail): absolute world-root *height* corrupted by the upstream double-yup
+  (up is along −z in the feature frame) — joints + tilt invert exactly, world translation does not.
+- **Gate B — PASSED.** Validate-the-validator: original motion executes upright in MuJoCo (survival 1.00).
+- **Gate C — PASSED.** Decoded (lat-256) motion survives 1.00, tracks 18.9° vs original 19.7°.
+- **Gate D — PASSED.** 6 motion types: decoded survival MATCHES original (mean 0.969 vs 0.961; box-jump 0.81 vs
+  0.77 at the tracker's limit). VAE-decoded motion is physically executable. → sim2sim uses the **hybrid reference**
+  (decoded joints + original root) to avoid the world-root-height artifact.
+- 19 tests + 1 documented xfail. PR #3.
+
+## TODO (future)
+- Upstream single-conversion fix in process_clip → enables full-root reconstruction (drop the hybrid).
+- Re-run Gate D with the lat-512 VAE once converged (compare decoded survival/tracking vs lat-256).
 
 ## Main risk
 Root integration drift (C2 rebuilds world trajectory from velocities). L0/L1 measure it; if real-clip drift
