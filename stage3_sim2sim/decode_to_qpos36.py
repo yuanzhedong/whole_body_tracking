@@ -24,7 +24,7 @@ from scipy.spatial.transform import Rotation
 
 from .rotation_utils import (
     T_ZUP_TO_YUP, T_YUP_TO_ZUP, roty, rotz, rot6d_to_matrix,
-    integrate_yaw, integrate_position, quat_xyzw_to_wxyz,
+    integrate_yaw, integrate_position, quat_xyzw_to_wxyz, quat_wxyz_to_xyzw,
 )
 
 ROT6D = slice(0, 6)
@@ -76,6 +76,29 @@ def invert_build_features(feats, dt, to_yup=False, root_pos0=None, yaw0=0.0):
 
     quat_xyzw = Rotation.from_matrix(R_in).as_quat().astype(np.float32)
     return root_pos.astype(np.float32), quat_xyzw, joints
+
+
+def qpos36_to_features(qpos36, dt, double_yup=True):
+    """Forward replica of the dataset feature build (``process_clip(to_yup=True)``).
+
+    z-up ``qpos_36`` -> 41-D features. Used to validate ``features_to_qpos36`` by a
+    feature-space round-trip on real clips, and to document the exact forward path:
+    pre-convert z-up -> y-up, then ``build_features(to_yup=True)`` (the second basis
+    change ``double_yup`` reproduces ``process_clip``'s behaviour).
+    """
+    import sys, os
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "stage2"))
+    from export_g1_motion import build_features  # local import to avoid hard dep at import time
+
+    qpos36 = np.asarray(qpos36, dtype=np.float64)
+    root_pos = qpos36[:, 0:3]
+    quat_xyzw = quat_wxyz_to_xyzw(qpos36[:, 3:7])
+    joints = qpos36[:, 7:36].astype(np.float32)
+    if double_yup:
+        R = Rotation.from_quat(quat_xyzw).as_matrix()
+        root_pos, R = _apply_basis(T_ZUP_TO_YUP, root_pos, R)
+        quat_xyzw = Rotation.from_matrix(R).as_quat()
+    return build_features(root_pos, quat_xyzw, joints, dt, to_yup=True)
 
 
 def features_to_qpos36(feats, dt, root_pos0_zup=None, yaw0=0.0, double_yup=True):
