@@ -1,0 +1,22 @@
+diff --git a/multimodal_tokenizers/models/biomechanics_tokenizer.py b/multimodal_tokenizers/models/biomechanics_tokenizer.py
+index 447c72e..449739e 100644
+--- a/multimodal_tokenizers/models/biomechanics_tokenizer.py
++++ b/multimodal_tokenizers/models/biomechanics_tokenizer.py
+@@ -101,9 +101,16 @@ class BioMechanicsTokenizer(BaseModel):
+         if motion_dim == BIO_MOT_DIM:
+             recons_slice = slice(BIO_ROOT_LINEAR_MOT_SLICE.stop, motion_dim)
+             root_slice = BIO_ROOT_LINEAR_MOT_SLICE
++        elif motion_dim == 41:
++            # G1 41-D: 6D-rot[0:6] + lin_vel[6:9] + ang_vel[9:12] + joints[12:41].
++            # Unlike the biomech velocity rep, root orientation is an EXPLICIT
++            # heading-canonical 6D rotation at [0:6] that must be reconstructed
++            # directly (otherwise it is left unsupervised -> garbage root tilt/facing).
++            # Supervise the whole feature; root_lin_vel still gets the extra root term.
++            recons_slice = slice(0, motion_dim)
++            root_slice = BIO_ROOT_LINEAR_MODEL_SLICE
+         else:
+             # BIO_MODEL_DIM (52) and any other rep whose root lin-vel lives at [6:9]
+-            # (e.g. G1 41-D: 6D-rot[0:6] + lin_vel[6:9] + ang_vel[9:12] + joints[12:41])
+             recons_slice = slice(BIO_ROOT_LINEAR_MODEL_SLICE.stop, motion_dim)
+             root_slice = BIO_ROOT_LINEAR_MODEL_SLICE
+         recons_loss = F.smooth_l1_loss(
