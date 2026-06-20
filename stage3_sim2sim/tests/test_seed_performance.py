@@ -40,3 +40,12 @@ def test_sim2sim_decoded_preserves_executability():
     assert s["decoded_survival_mean"] >= 0.95 * s["orig_survival_mean"], s
     # a clear majority of clips survive fully under full decoded root
     assert s["frac_full_survival"] >= 0.6, s
+
+
+def test_sim2sim_decoded_survival_on_tracker_feasible():
+    """Isolated from tracker limits: on clips the tracker CAN execute (original survival>=0.9),
+    the VAE-decoded full-root motion survives almost perfectly -> the VAE is not the bottleneck."""
+    f = _load(os.path.join(HERE, "..", "seed_sim2sim_feasible_summary.json"))
+    assert f["feasible_n"] >= 30
+    assert f["decoded_survival_on_feasible"] >= 0.9, f
+    assert f["frac_full_on_feasible"] >= 0.85, f
