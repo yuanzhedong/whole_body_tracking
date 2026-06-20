@@ -1,0 +1,29 @@
+[
+  {
+    "clip": "injured_torso_walk_forward_002__A057",
+    "mode": "full_root",
+    "decode_joint_rmse_deg": 6.45,
+    "orig_survival": 1.0,
+    "orig_track_deg": 16.4,
+    "decoded_survival": 1.0,
+    "decoded_track_deg": 16.4
+  },
+  {
+    "clip": "dance_hiphop_running_man_4_direction",
+    "mode": "full_root",
+    "decode_joint_rmse_deg": 12.27,
+    "orig_survival": 1.0,
+    "orig_track_deg": 11.4,
+    "decoded_survival": 1.0,
+    "decoded_track_deg": 9.8
+  },
+  {
+    "clip": "box_jump_003__A360_M:v0",
+    "mode": "full_root",
+    "decode_joint_rmse_deg": 11.82,
+    "orig_survival": 0.766,
+    "orig_track_deg": 24.2,
+    "decoded_survival": 1.0,
+    "decoded_track_deg": 18.8
+  }
+]

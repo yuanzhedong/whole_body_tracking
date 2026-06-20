@@ -20,12 +20,11 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 from stage3_sim2sim.sim2sim import (
     build_qpos36_from_artifact, build_hybrid_qpos36, run_tracker, rollout_metrics,
 )
-from stage3_sim2sim.decode_to_qpos36 import qpos36_to_features
+from stage3_sim2sim.decode_to_qpos36 import qpos36_to_features, features_to_qpos36
 from stage3_sim2sim.vae_decode_clip import load_vae, decode_features
 
 ONNX = ("/scratch/user/yzdong/OMG-models/holomotion_dl/"
         "HoloMotion_motion_tracking_model_v1.3.1/exported/motion_tracking_model.onnx")
-NORM = "/scratch/user/yzdong/OMG-Data/umt/g1_seed_full_yup/normalization.npz"
 
 
 def main():
@@ -38,9 +37,14 @@ def main():
     ap.add_argument("--out", default="/tmp/sim2sim_l3")
     ap.add_argument("--num-frames", type=int, default=128)
     ap.add_argument("--device", default="cpu")
+    ap.add_argument("--full_root", action="store_true",
+                    help="use the FULL decoded root (features_to_qpos36) instead of the hybrid "
+                         "(decoded joints + original root). Requires the root-fixed dataset.")
     args = ap.parse_args()
 
-    norm = np.load(NORM)
+    from omegaconf import OmegaConf
+    data_dir = str(OmegaConf.load(args.cfg).DATASET.data_dir)   # normalization matches the trained data
+    norm = np.load(f"{data_dir}/normalization.npz")
     model, ws = load_vae(args.cfg, args.ckpt, args.umt_root, device=args.device)
     out = Path(args.out); out.mkdir(parents=True, exist_ok=True)
     rows = []
@@ -52,10 +56,14 @@ def main():
         feats = qpos36_to_features(qpos_gt, 1 / 30)
         rec = decode_features(model, feats[:ws], norm["mean"], norm["std"],
                               device=args.device, window=ws)
-        hybrid = build_hybrid_qpos36(rec, qpos_gt[:ws])
+        if args.full_root:
+            decoded = features_to_qpos36(rec, 1 / 30, root_pos0_zup=qpos_gt[0, :3])  # full decoded root
+        else:
+            decoded = build_hybrid_qpos36(rec, qpos_gt[:ws])                          # decoded joints + orig root
         jdeg = float(np.sqrt(np.mean((rec[:, 12:41] - feats[:ws, 12:41]) ** 2)) * 180 / np.pi)
-        res = {"clip": name, "decode_joint_rmse_deg": round(jdeg, 2)}
-        for tag, q in [("orig", qpos_gt[:ws]), ("decoded", hybrid)]:
+        res = {"clip": name, "mode": "full_root" if args.full_root else "hybrid",
+               "decode_joint_rmse_deg": round(jdeg, 2)}
+        for tag, q in [("orig", qpos_gt[:ws]), ("decoded", decoded)]:
             roll = run_tracker(q, fps=30, out_dir=out / name / tag, onnx_path=ONNX,
                                omg_root=args.omg_root, num_frames=args.num_frames)
             d = np.load(roll)
