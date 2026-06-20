@@ -1,0 +1,111 @@
+{
+  "ckpt": "experiments/_compare/g1_seed_512_fixed_FINAL.ckpt",
+  "n_clips": 500,
+  "overall": {
+    "n": 500,
+    "joint_rmse_deg": 8.09,
+    "root_geo_deg": 6.15,
+    "nm_joints": 0.234,
+    "nm_rot6d": 13.269
+  },
+  "static": {
+    "n": 250,
+    "joint_rmse_deg": 4.71,
+    "root_geo_deg": 5.41,
+    "nm_joints": 0.08,
+    "nm_rot6d": 16.396
+  },
+  "dynamic": {
+    "n": 250,
+    "joint_rmse_deg": 11.47,
+    "root_geo_deg": 6.88,
+    "nm_joints": 0.387,
+    "nm_rot6d": 10.142
+  },
+  "by_category": {
+    "bow": {
+      "n": 4,
+      "joint_rmse_deg": 11.85,
+      "root_geo_deg": 11.33,
+      "nm_joints": 0.256,
+      "nm_rot6d": 9.469
+    },
+    "crouch": {
+      "n": 9,
+      "joint_rmse_deg": 8.42,
+      "root_geo_deg": 12.35,
+      "nm_joints": 0.269,
+      "nm_rot6d": 8.711
+    },
+    "dance": {
+      "n": 43,
+      "joint_rmse_deg": 17.26,
+      "root_geo_deg": 6.19,
+      "nm_joints": 0.734,
+      "nm_rot6d": 9.431
+    },
+    "idle": {
+      "n": 38,
+      "joint_rmse_deg": 3.78,
+      "root_geo_deg": 5.1,
+      "nm_joints": 0.069,
+      "nm_rot6d": 18.799
+    },
+    "jog": {
+      "n": 35,
+      "joint_rmse_deg": 8.12,
+      "root_geo_deg": 5.47,
+      "nm_joints": 0.224,
+      "nm_rot6d": 9.73
+    },
+    "jump": {
+      "n": 33,
+      "joint_rmse_deg": 8.14,
+      "root_geo_deg": 5.14,
+      "nm_joints": 0.208,
+      "nm_rot6d": 11.983
+    },
+    "other": {
+      "n": 186,
+      "joint_rmse_deg": 7.87,
+      "root_geo_deg": 5.95,
+      "nm_joints": 0.199,
+      "nm_rot6d": 15.866
+    },
+    "reach": {
+      "n": 7,
+      "joint_rmse_deg": 7.84,
+      "root_geo_deg": 8.83,
+      "nm_joints": 0.141,
+      "nm_rot6d": 10.42
+    },
+    "sit": {
+      "n": 28,
+      "joint_rmse_deg": 7.59,
+      "root_geo_deg": 11.5,
+      "nm_joints": 0.267,
+      "nm_rot6d": 7.777
+    },
+    "step": {
+      "n": 4,
+      "joint_rmse_deg": 8.06,
+      "root_geo_deg": 5.32,
+      "nm_joints": 0.197,
+      "nm_rot6d": 14.953
+    },
+    "turn": {
+      "n": 12,
+      "joint_rmse_deg": 7.28,
+      "root_geo_deg": 6.77,
+      "nm_joints": 0.248,
+      "nm_rot6d": 11.325
+    },
+    "walk": {
+      "n": 99,
+      "joint_rmse_deg": 6.19,
+      "root_geo_deg": 4.99,
+      "nm_joints": 0.148,
+      "nm_rot6d": 12.223
+    }
+  }
+}
