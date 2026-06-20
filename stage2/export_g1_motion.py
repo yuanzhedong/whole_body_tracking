@@ -165,20 +165,20 @@ def process_clip(path, target_fps, to_yup=False):
     root_quat_rs = Slerp(t_in, Rotation.from_quat(root_q_xyzw))(
         np.clip(t_out, t_in[0], t_in[-1])).as_quat()                      # xyzw [T,4]
     root_pos = body_pos_w[:, ROOT_BODY_INDEX, :]                          # z-up
+    root_pos_z = root_pos.copy()                                          # keep z-up for features
+    root_quat_z = root_quat_rs.copy()                                     # keep z-up xyzw for features
 
     if to_yup:
         # Convert FK ground truth to y-up so eval metrics live in the same frame as features.
         body_pos_w = np.einsum("ij,tbj->tbi", T_ZUP_TO_YUP, body_pos_w)
-        root_pos_feat = (T_ZUP_TO_YUP @ root_pos.T).T
-        R_rs = Rotation.from_quat(root_quat_rs).as_matrix()               # [T,3,3] z-up
-        R_yup = T_ZUP_TO_YUP @ R_rs @ T_ZUP_TO_YUP.T                     # [T,3,3] y-up (broadcast over T)
-        root_quat_feat = Rotation.from_matrix(R_yup).as_quat()            # xyzw y-up
-        root_quat_rs = root_quat_feat                                      # save y-up quat as raw too
-    else:
-        root_pos_feat = root_pos
-        root_quat_feat = root_quat_rs
+        R_yup = T_ZUP_TO_YUP @ Rotation.from_quat(root_quat_rs).as_matrix() @ T_ZUP_TO_YUP.T
+        root_quat_rs = Rotation.from_matrix(R_yup).as_quat()              # xyzw y-up (raw/eval only)
 
-    feats = build_features(root_pos_feat, root_quat_feat, joint_pos,
+    # Features: build_features applies the SINGLE z-up->y-up conversion internally when to_yup.
+    # (Previously the root was pre-converted to y-up AND build_features converted it again -> a
+    #  double basis change that put "up" on -z and corrupted the inverted world-root height. We
+    #  now pass z-up inputs so the conversion happens exactly once and the inverse recovers root.)
+    feats = build_features(root_pos_z, root_quat_z, joint_pos,
                            1.0 / target_fps, to_yup=to_yup)
     raw = {"joint_pos": joint_pos.astype(np.float32),
            "body_pos_w": body_pos_w.astype(np.float32),
@@ -204,7 +204,9 @@ def main():
     p.add_argument("--window", type=int, default=128, help="window size for the #windows stat / datamodule")
     p.add_argument("--val_ratio", type=float, default=0.1)
     p.add_argument("--test_ratio", type=float, default=0.1)
-    p.add_argument("--split_mode", choices=["clip", "category"], default="clip")
+    p.add_argument("--split_mode", choices=["clip", "category", "within_clip"], default="clip",
+                   help="within_clip: hold out last val_ratio of windows from each clip "
+                        "(in-distribution val, avoids OOD/overlap problems)")
     p.add_argument("--holdout_categories", nargs="*", default=[], help="category-mode: these go entirely to test")
     p.add_argument("--quality_json", default=None, help="{clip: {survival, e_mpbpe_mm}}; clips failing thresholds are dropped")
     p.add_argument("--min_survival", type=float, default=0.95)
@@ -214,6 +216,9 @@ def main():
                         "Run with --verify_only first to inspect the sanity check printout.")
     p.add_argument("--verify_only", action="store_true",
                    help="run one clip with --to_yup, print sanity checks, then exit (no files written)")
+    p.add_argument("--include_clips", nargs="*", default=None,
+                   help="whitelist of clip names to include (e.g. walk1_subject1 lafan_run1_subject2). "
+                        "If omitted, all non-amass clips are included.")
     args = p.parse_args()
 
     quality = json.load(open(args.quality_json)) if args.quality_json else None
@@ -254,6 +259,10 @@ def main():
             n_todo += 1
             continue
 
+        if args.include_clips is not None and name not in args.include_clips:
+            print(f"  skip  {name}: not in --include_clips whitelist")
+            continue
+
         cat = categorize(name)
         q = quality.get(name) if quality else None
         if quality is not None:
@@ -264,6 +273,31 @@ def main():
                 n_drop += 1; continue
 
         feats, raw, in_fps, nfr = process_clip(path, args.target_fps, to_yup=args.to_yup)
+
+        if args.split_mode == "within_clip":
+            # Hold out last val_ratio of windows from EACH clip as val (in-distribution).
+            # Both halves get saved; the DataModule uses all frames, but we save to
+            # separate split dirs so val never bleeds into normalization stats.
+            T = feats.shape[0]
+            cut = max(args.window, int(T * (1 - args.val_ratio)))
+            feats_train = feats[:cut]
+            feats_val   = feats[cut - args.window + 1:]  # overlap by window-1 for clean windows
+            np.savez(os.path.join(args.out_dir, "train", name + ".npz"),
+                     motion=feats_train, category=cat, **{k: raw[k][:cut] if hasattr(raw[k],'__len__') and len(raw[k])==T else raw[k] for k in raw})
+            np.savez(os.path.join(args.out_dir, "val",   name + "_val.npz"),
+                     motion=feats_val,   category=cat, **{k: raw[k][cut-args.window+1:] if hasattr(raw[k],'__len__') and len(raw[k])==T else raw[k] for k in raw})
+            train_frames.append(feats_train)
+            split = "within_clip(train+val)"
+            n_win_tr = max(0, feats_train.shape[0] - args.window + 1)
+            n_win_va = max(0, feats_val.shape[0]   - args.window + 1)
+            manifest[name] = {"split": split, "category": cat, "n_frames_in": int(nfr),
+                               "n_frames_out": int(T), "in_fps": in_fps,
+                               "out_fps": args.target_fps,
+                               "n_windows_train": int(n_win_tr), "n_windows_val": int(n_win_va), "quality": q}
+            n_inc += 1
+            print(f"  ok    {name:38s} {cat:7s} within  {nfr:6d}@{in_fps} -> {T:5d}@{args.target_fps}  train_win={n_win_tr} val_win={n_win_va}")
+            continue
+
         if args.split_mode == "category":
             split = "test" if cat in args.holdout_categories else assign_split(name, args.val_ratio, 0.0)
         else:

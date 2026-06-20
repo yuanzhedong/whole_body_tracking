@@ -78,13 +78,13 @@ def invert_build_features(feats, dt, to_yup=False, root_pos0=None, yaw0=0.0):
     return root_pos.astype(np.float32), quat_xyzw, joints
 
 
-def qpos36_to_features(qpos36, dt, double_yup=True):
-    """Forward replica of the dataset feature build (``process_clip(to_yup=True)``).
+def qpos36_to_features(qpos36, dt, double_yup=False):
+    """Forward replica of the dataset feature build -> 41-D features.
 
-    z-up ``qpos_36`` -> 41-D features. Used to validate ``features_to_qpos36`` by a
-    feature-space round-trip on real clips, and to document the exact forward path:
-    pre-convert z-up -> y-up, then ``build_features(to_yup=True)`` (the second basis
-    change ``double_yup`` reproduces ``process_clip``'s behaviour).
+    Default (``double_yup=False``) matches the FIXED ``process_clip``: a single
+    z-up->y-up conversion inside ``build_features(to_yup=True)``. Set
+    ``double_yup=True`` only to reproduce the legacy (buggy) double-conversion that
+    older datasets / VAE checkpoints were built with.
     """
     import sys, os
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "stage2"))
@@ -101,13 +101,14 @@ def qpos36_to_features(qpos36, dt, double_yup=True):
     return build_features(root_pos, quat_xyzw, joints, dt, to_yup=True)
 
 
-def features_to_qpos36(feats, dt, root_pos0_zup=None, yaw0=0.0, double_yup=True):
-    """Inverse of the dataset path (``process_clip(..., to_yup=True)``) -> z-up qpos_36.
+def features_to_qpos36(feats, dt, root_pos0_zup=None, yaw0=0.0, double_yup=False):
+    """Inverse of the dataset feature build -> z-up ``qpos_36``.
 
-    ``process_clip`` pre-converts the clip to y-up and *also* calls
-    ``build_features(to_yup=True)`` (a second basis change). ``double_yup=True``
-    undoes that extra change so the returned root is in true z-up world frame,
-    matching what the HoloMotion exporter expects.
+    Default (``double_yup=False``) matches the FIXED single-conversion
+    ``process_clip``: root height + tilt + joints are recovered exactly; absolute
+    XY/heading is integrated (translation/heading-invariant by design, which the
+    HoloMotion tracker tolerates). Set ``double_yup=True`` only for legacy
+    double-conversion datasets (where world-root height is corrupted).
 
     Returns ``qpos_36[T,36] = [root_pos(3), root_quat_wxyz(4), joints(29)]``.
     """

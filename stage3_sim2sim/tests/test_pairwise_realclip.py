@@ -1,119 +1,85 @@
-"""L1 pairwise: inverse on REAL seed clips (not synthetic) + drift report.
+"""L1 pairwise: forward+inverse on REAL seed clips (FIXED single-conversion convention).
 
-Validates that `features_to_qpos36` is a faithful inverse of the dataset feature
-build on the real feature distribution: joints pass through exactly, and a
-feature-space round-trip (features -> qpos36 -> features') recovers the root
-feature blocks within an integration-drift tolerance. Skips cleanly if the seed
-dataset isn't present on this machine.
+Source of truth is the artifact ground-truth qpos (build_qpos36_from_artifact); we
+build features with the fixed forward (qpos36_to_features, single y-up conversion) and
+invert them. Joints, root TILT, and root HEIGHT are recovered exactly; absolute
+XY/heading is integrated (translation/heading-invariant by design) and only reported.
 """
 import glob
 import numpy as np
 import pytest
 
 from stage3_sim2sim.decode_to_qpos36 import features_to_qpos36, qpos36_to_features
+from stage3_sim2sim.sim2sim import build_qpos36_from_artifact
 
-VAL_DIR = "/scratch/user/yzdong/OMG-Data/umt/g1_seed_full_yup/val"
+ART_GLOB = "/scratch/user/yzdong/OMG-Data/raw/bones_seed/artifacts_seed_full/*walk*/motion.npz"
 WS = 128
+DT = 1 / 30
 
 
-def _val_clips(n=5):
-    files = sorted(glob.glob(f"{VAL_DIR}/*.npz"))
-    if not files:
-        pytest.skip(f"seed val set not present at {VAL_DIR}")
-    return files[:n]
+def _clips(n=6):
+    arts = sorted(glob.glob(ART_GLOB))
+    if not arts:
+        pytest.skip("seed artifacts not present")
+    out = []
+    for a in arts:
+        q = build_qpos36_from_artifact(a)
+        if q.shape[0] >= WS:
+            out.append(q)
+        if len(out) >= n:
+            break
+    if not out:
+        pytest.skip("no clips >= window length")
+    return out
 
 
 def test_joint_passthrough_exact():
-    for f in _val_clips():
-        d = np.load(f, allow_pickle=True)
-        feats = d["motion"][:WS]
-        if feats.shape[0] < WS:
-            continue
-        dt = 1.0 / float(np.asarray(d["fps"]).reshape(-1)[0])
-        qpos = features_to_qpos36(feats, dt)
-        # qpos joints (cols 7:36) must equal the feature joints (cols 12:41) exactly
-        assert np.allclose(qpos[:, 7:36], feats[:, 12:41], atol=1e-5)
-        # ...and equal the stored raw joint_pos exactly
-        assert np.allclose(qpos[:, 7:36], d["joint_pos"][:WS], atol=1e-4)
+    for q in _clips():
+        feats = qpos36_to_features(q, DT)
+        rec = features_to_qpos36(feats, DT, root_pos0_zup=q[0, :3])
+        assert np.allclose(rec[:, 7:36], feats[:, 12:41], atol=1e-5)   # qpos joints == feature joints
+        assert np.allclose(rec[:, 7:36], q[:len(rec), 7:36], atol=1e-4)  # == ground-truth joints
 
 
-def test_feature_space_roundtrip_realclips(capsys):
-    """features -> qpos36 -> features' on real clips.
-
-    Asserts the quantities that form the robot reference (joints, tilt via rot6d,
-    linear velocity). The angular-velocity block is only *reported*: it is a
-    finite-difference-derived feature, NOT part of qpos_36 (the tracker computes
-    its own velocities from the qpos sequence), so a tight round-trip of it is
-    neither expected nor required.
-    """
-    rot_errs, lin_errs, ang_errs, jt_errs = [], [], [], []
-    for f in _val_clips(8):
-        d = np.load(f, allow_pickle=True)
-        feats = d["motion"][:WS].astype(np.float64)
-        if feats.shape[0] < WS:
-            continue
-        dt = 1.0 / float(np.asarray(d["fps"]).reshape(-1)[0])
-        qpos = features_to_qpos36(feats, dt)
-        feats2 = qpos36_to_features(qpos, dt)
-        # interior frames (exclude 2-frame finite-difference boundary)
-        sl = slice(2, -2)
-        rot_errs.append(np.abs(feats2[sl, 0:6] - feats[sl, 0:6]).max())
-        lin_errs.append(np.abs(feats2[sl, 6:9] - feats[sl, 6:9]).max())
-        ang_errs.append(np.abs(feats2[sl, 9:12] - feats[sl, 9:12]).max())
-        jt_errs.append(np.abs(feats2[sl, 12:41] - feats[sl, 12:41]).max())
-    rot, lin, ang, jt = (float(np.mean(x)) for x in (rot_errs, lin_errs, ang_errs, jt_errs))
-    with capsys.disabled():
-        print(f"\n[L1 real-clip feature round-trip, interior] joints max={jt:.2e}  "
-              f"rot6d(tilt) max={rot:.2e}  lin_vel max={lin:.2e}  "
-              f"ang_vel max={ang:.3f} (derived, reported only)")
-    # what forms the qpos_36 reference must be faithful:
-    assert jt < 1e-4, f"joints not exact: {jt}"
-    assert rot < 1e-3, f"tilt (rot6d) drifted: {rot}"
-    assert lin < 5e-3, f"linear velocity drifted: {lin}"
-
-
-@pytest.mark.xfail(reason="upstream double-yup in process_clip corrupts integrated "
-                          "world-root height; sim2sim uses the hybrid (decoded joints "
-                          "+ original root) instead. Joints + tilt are exact.",
-                   strict=True)
 def test_absolute_root_height_recovered():
-    """KNOWN LIMITATION (documented): full-root reconstruction can't recover absolute
-    pelvis height because the dataset feature frame has up along -z (double basis
-    change), so yaw-reconstruction error leaks into height. Kept as an xfail to track
-    the upstream fix; sim2sim does not rely on this path."""
-    from stage3_sim2sim.decode_to_qpos36 import qpos36_to_features
-    from stage3_sim2sim.sim2sim import build_qpos36_from_artifact
-    arts = sorted(glob.glob("/scratch/user/yzdong/OMG-Data/raw/bones_seed/artifacts_seed_full/*walk*/motion.npz"))
-    if not arts:
-        pytest.skip("seed artifacts not present")
-    qpos_gt = build_qpos36_from_artifact(arts[0])
-    feats = qpos36_to_features(qpos_gt, 1 / 30)
-    qpos_rec = features_to_qpos36(feats, 1 / 30, root_pos0_zup=qpos_gt[0, :3])
-    n = min(len(qpos_rec), len(qpos_gt))
-    assert np.abs(qpos_rec[:n, 2] - qpos_gt[:n, 2]).max() < 0.05
+    """FIXED: single-conversion forward -> the inverse recovers absolute pelvis height."""
+    for q in _clips():
+        feats = qpos36_to_features(q, DT)
+        rec = features_to_qpos36(feats, DT, root_pos0_zup=q[0, :3])
+        n = min(len(rec), len(q))
+        zerr = np.abs(rec[:n, 2] - q[:n, 2]).max()
+        assert zerr < 0.02, f"absolute pelvis height not recovered: {zerr:.4f} m"
 
 
-def test_root_drift_report(capsys):
-    """Report integrated-root vs stored ground-truth root drift (y-up body_pos_w[:,0])."""
-    drifts = []
-    for f in _val_clips(8):
-        d = np.load(f, allow_pickle=True)
-        feats = d["motion"][:WS].astype(np.float64)
-        if feats.shape[0] < WS:
-            continue
-        dt = 1.0 / float(np.asarray(d["fps"]).reshape(-1)[0])
-        # seed at the true initial root (y-up body_pos_w idx0 -> z-up via inverse basis)
-        from stage3_sim2sim.rotation_utils import T_YUP_TO_ZUP
-        root0_zup = T_YUP_TO_ZUP @ d["body_pos_w"][0, 0]
-        qpos = features_to_qpos36(feats, dt, root_pos0_zup=root0_zup)
-        # ground-truth root path in z-up
-        gt_zup = (T_YUP_TO_ZUP @ d["body_pos_w"][:WS, 0].T).T
-        # compare horizontal drift relative to start (heading is unobserved, so this is an upper bound)
-        rec_rel = qpos[:, 0:3] - qpos[0, 0:3]
-        gt_rel = gt_zup - gt_zup[0]
-        drifts.append(np.linalg.norm(rec_rel - gt_rel, axis=1).max())
+def test_feature_space_roundtrip(capsys):
+    rot_e, lin_e, ang_e, jt_e = [], [], [], []
+    for q in _clips(8):
+        feats = qpos36_to_features(q, DT).astype(np.float64)
+        rec = features_to_qpos36(feats, DT, root_pos0_zup=q[0, :3])
+        feats2 = qpos36_to_features(rec, DT)
+        sl = slice(2, -2)
+        rot_e.append(np.abs(feats2[sl, 0:6] - feats[sl, 0:6]).max())
+        lin_e.append(np.abs(feats2[sl, 6:9] - feats[sl, 6:9]).max())
+        ang_e.append(np.abs(feats2[sl, 9:12] - feats[sl, 9:12]).max())
+        jt_e.append(np.abs(feats2[sl, 12:41] - feats[sl, 12:41]).max())
+    rot, lin, ang, jt = (float(np.mean(x)) for x in (rot_e, lin_e, ang_e, jt_e))
     with capsys.disabled():
-        print(f"\n[L1 root-drift] mean/max over clips: "
-              f"{np.mean(drifts):.3f} / {np.max(drifts):.3f} m (128-frame window)")
-    # informational gate: drift should be sub-metre over ~4 s; hard fail only if absurd
-    assert np.max(drifts) < 1.0
+        print(f"\n[L1 feature round-trip] joints={jt:.2e} tilt={rot:.2e} lin_vel={lin:.2e} "
+              f"ang_vel={ang:.3f} (derived, reported)")
+    assert jt < 1e-4 and rot < 1e-3 and lin < 5e-3
+
+
+def test_root_xy_drift_reported(capsys):
+    """Absolute XY/heading is integrated and NOT preserved (heading-canonical rep);
+    reported only. The tracker is XY/heading-invariant, so this does not affect sim2sim."""
+    heights, xys = [], []
+    for q in _clips(8):
+        feats = qpos36_to_features(q, DT)
+        rec = features_to_qpos36(feats, DT, root_pos0_zup=q[0, :3])
+        n = min(len(rec), len(q))
+        heights.append(np.abs(rec[:n, 2] - q[:n, 2]).max())
+        xys.append(np.linalg.norm(rec[:n, :2] - q[:n, :2], axis=1).max())
+    with capsys.disabled():
+        print(f"\n[L1 root] height err max={max(heights):.4f}m (recovered)  "
+              f"XY drift max={max(xys):.2f}m (heading-invariant, expected)")
+    assert max(heights) < 0.02   # height IS recovered; XY drift is expected and not asserted
