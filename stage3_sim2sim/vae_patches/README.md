@@ -4,15 +4,20 @@ These capture the new-pipeline changes that live in the **UniMoTok submodule**
 (`Juzezhang/UniMoTok` @ `wbt-integration`). They're vendored here as reviewable files
 because the submodule is a third-party repo we don't push to. Apply them in the submodule.
 
-## 1. Loss fix — `biomechanics_tokenizer_rootrot6d_lossfix.patch`
-The G1 41-D feature puts the root's heading-canonical **6D rotation at dims [0:6]**, but the
-reconstruction loss only supervised `[9:41]` for non-biomech features → root orientation was
-**left unsupervised** (decoded root tilt/facing was garbage; normalized MSE 2.47 → worse than
-the mean). The patch adds a `motion_dim == 41` branch that supervises the **full** feature
-(root_rot6d normalized MSE 2.47 → 0.048). Apply:
-```
-cd UniMoTok && git apply ../stage3_sim2sim/vae_patches/biomechanics_tokenizer_rootrot6d_lossfix.patch
-```
+## 1. Loss fix — `biomechanics_tokenizer_rootrot6d_lossfix.patch`  ⚠️ PROVEN REDUNDANT — NOT applied
+
+**Do not apply this.** It is kept only as reference for the investigation.
+
+We initially thought the G1 root orientation (rot6d, dims [0:6]) was *unsupervised* (the main
+reconstruction slice for 41-D is `[9:41]`). That was wrong: **stock UniMoTok already supervises
+root orientation** via a **geodesic loss** on dims [0:6] (`root_orient_loss`, gated by
+`LAMBDA_ROOT_ORIENT`, which our configs set to 5.0). The misleading signal was that we measured
+*raw 6D MSE* (2.47) — but 6D rotation isn't unique, so raw-MSE can be high while the rotation is
+correct. The patch (smooth_l1 on raw [0:6]) duplicates supervision the geodesic term already provides.
+
+Proof (gradient flow on the real loss): `stage3_sim2sim/tests/test_unimotok_root_orient.py` —
+`|grad on [0:6]|` is 11.10 with `LAMBDA_ROOT_ORIENT=5` and 0.00 with `=0`. So we train on **stock
+UniMoTok**; this patch is intentionally *not* applied.
 
 ## 2. Training configs — `configs/config_g1_seed_*.yaml`
 G1 MLD-VAE configs on the BONES-SEED 41-D features (drop into `UniMoTok/configs/`):
