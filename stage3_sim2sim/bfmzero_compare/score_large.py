@@ -12,8 +12,10 @@ import numpy as np
 
 from stage3_sim2sim.sim2sim import rollout_metrics
 
+import sys
 HERE = os.path.dirname(os.path.abspath(__file__))
-man = json.load(open(f"{HERE}/large_sample.json"))
+TAG = sys.argv[1] if len(sys.argv) > 1 else "large"
+man = json.load(open(f"{HERE}/{TAG}_sample.json"))
 
 
 def load(p):
@@ -23,7 +25,7 @@ def load(p):
 
 rows = []
 for m in man:
-    bp, hp = f"{HERE}/large/bfm/rollout_{m['idx']}.npz", f"{HERE}/large/holo/holo_{m['idx']}.npz"
+    bp, hp = f"{HERE}/{TAG}/bfm/rollout_{m['idx']}.npz", f"{HERE}/{TAG}/holo/holo_{m['idx']}.npz"
     if not (os.path.exists(bp) and os.path.exists(hp)):
         continue
     bex, bref = load(bp); hex_, href = load(hp)
@@ -59,7 +61,7 @@ report = {
                     for c in sorted({r["cat"] for r in rows}) if sum(r["cat"] == c for r in rows) >= 3},
     "rows": rows,
 }
-json.dump(report, open(f"{HERE}/large_survival.json", "w"), indent=2)
+json.dump(report, open(f"{HERE}/{TAG}_survival.json", "w"), indent=2)
 
 # ---- issue flagging ----
 issues = {
@@ -70,7 +72,7 @@ issues = {
     "suspicious_reference_low_pelvis": [r for r in rows if r["ref_pelvis_min"] < 0.0],
     "bfm_low_survival": sorted([r for r in rows if r["bfm_rel"] < 0.5], key=lambda r: r["bfm_rel"]),
 }
-json.dump({k: v[:40] for k, v in issues.items()}, open(f"{HERE}/large_issues.json", "w"), indent=2)
+json.dump({k: v[:40] for k, v in issues.items()}, open(f"{HERE}/{TAG}_issues.json", "w"), indent=2)
 
 o = report["overall"]
 print(f"\nOVERALL n={o['n']}: survival_rel HOLO {o['holo_rel']} BFM {o['bfm_rel']} | "
@@ -84,4 +86,4 @@ for c, a in report["by_category"].items():
 print("\n=== ISSUES ===")
 for k, v in issues.items():
     print(f"  {k}: {len(v)} clips")
-print("wrote large_survival.json + large_issues.json")
+print(f"wrote {TAG}_survival.json + {TAG}_issues.json")

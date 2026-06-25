@@ -9,12 +9,14 @@ ONNX = ("/scratch/user/yzdong/OMG-models/holomotion_dl/"
         "HoloMotion_motion_tracking_model_v1.3.1/exported/motion_tracking_model.onnx")
 OMG_ROOT = "/ws/user/yzdong/src/github/OMG"
 HERE = os.path.dirname(os.path.abspath(__file__))
-DST = f"{HERE}/large/holo"
 
 import sys
-man = json.load(open(f"{HERE}/large_sample.json"))
-start = int(sys.argv[1]) if len(sys.argv) > 1 else 0
-end = int(sys.argv[2]) if len(sys.argv) > 2 else len(man)
+TAG = sys.argv[1] if len(sys.argv) > 1 else "large"
+DST = f"{HERE}/{TAG}/holo"
+os.makedirs(DST, exist_ok=True)
+man = json.load(open(f"{HERE}/{TAG}_sample.json"))
+start = int(sys.argv[2]) if len(sys.argv) > 2 else 0
+end = int(sys.argv[3]) if len(sys.argv) > 3 else len(man)
 done = 0
 for m in man[start:end]:
     out = f"{DST}/holo_{m['idx']}.npz"

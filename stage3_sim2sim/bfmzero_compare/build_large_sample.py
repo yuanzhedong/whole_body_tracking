@@ -41,7 +41,7 @@ def ok_length(art):
         return False
 
 
-def main():
+def main(tag="large", scale=1.0):
     random.seed(7)
     names = [n for n in os.listdir(ARTROOT) if n.endswith(":v0")]
     by_cat = {}
@@ -53,8 +53,9 @@ def main():
     for c in ORDER:
         pool = by_cat.get(c, [])
         random.shuffle(pool)
+        quota = min(int(round(QUOTA[c] * scale)), len(pool))
         picked, i = [], 0
-        while len(picked) < QUOTA[c] and i < len(pool):
+        while len(picked) < quota and i < len(pool):
             if ok_length(pool[i]):
                 picked.append(pool[i])
             i += 1
@@ -62,11 +63,12 @@ def main():
             manifest.append({"idx": len(manifest), "artifact": a, "cat": c,
                              "group": "near-ground" if c in NEAR else "standing"})
         print(f"  {c:8s}: {len(picked):4d} (pool {len(pool)})")
-    json.dump(manifest, open(f"{HERE}/large_sample.json", "w"))
+    json.dump(manifest, open(f"{HERE}/{tag}_sample.json", "w"))
     n_near = sum(m["group"] == "near-ground" for m in manifest)
     print(f"\nTOTAL {len(manifest)} clips ({n_near} near-ground, {len(manifest)-n_near} standing)")
-    print(f"wrote {HERE}/large_sample.json")
+    print(f"wrote {HERE}/{tag}_sample.json")
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+    main(sys.argv[1] if len(sys.argv) > 1 else "large", float(sys.argv[2]) if len(sys.argv) > 2 else 1.0)
