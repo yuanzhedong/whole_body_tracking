@@ -13,9 +13,9 @@ from stage3_sim2sim.sim2sim import rollout_metrics
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 CLIPS = [
-    ("clip0", "crouch_idle_right_R_003__A247_M", "deep crouch (idle)"),
-    ("clip1", "crouch_ff_start_270_R_001__A197_M", "crouch + turn"),
-    ("clip2", "sit_on_chair_stop_R_001__A047", "sit down"),
+    ("clip0", "crouch_ff_start_180_R_003__A145_M", "deep crouch"),
+    ("clip1", "squat_002__A359", "squat (start standing)"),
+    ("clip2", "sit_on_chair_stop_R_001__A047", "sit on chair"),
     ("clip3", "squat_001__A360", "squat"),
 ]
 

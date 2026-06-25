@@ -19,10 +19,9 @@ OMG_ROOT = "/ws/user/yzdong/src/github/OMG"
 OUT = os.path.dirname(os.path.abspath(__file__))
 
 CLIPS = [
-    ("clip0", "crouch_idle_right_R_003__A247_M:v0", "deep crouch (idle)"),
-    ("clip1", "crouch_ff_start_270_R_001__A197_M:v0", "crouch + turn"),
-    ("clip2", "sit_on_chair_stop_R_001__A047:v0", "sit down"),
-    ("clip3", "squat_001__A360:v0", "squat"),
+    # only the two replaced (grounded) clips; clip2/clip3 reuse existing rollouts
+    ("clip0", "crouch_ff_start_180_R_003__A145_M:v0", "deep crouch"),
+    ("clip1", "squat_002__A359:v0", "squat (start standing)"),
 ]
 
 for cid, art, desc in CLIPS:

@@ -17,10 +17,9 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ART = "/scratch/user/yzdong/OMG-Data/raw/bones_seed/artifacts_seed_full"
 FFMPEG = "/usr/bin/ffmpeg"
 CLIPS = [
-    ("clip0", "crouch_idle_right_R_003__A247_M:v0"),
-    ("clip1", "crouch_ff_start_270_R_001__A197_M:v0"),
-    ("clip2", "sit_on_chair_stop_R_001__A047:v0"),
-    ("clip3", "squat_001__A360:v0"),
+    # only the two replaced (grounded) clips; clip2/clip3 triptychs are unchanged
+    ("clip0", "crouch_ff_start_180_R_003__A145_M:v0"),
+    ("clip1", "squat_002__A359:v0"),
 ]
 
 

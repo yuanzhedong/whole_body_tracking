@@ -12,7 +12,7 @@ import wandb.apis.reports as wr
 
 ENTITY = "toddler_tracking"
 PROJECT = "g1-sim2sim"
-RUN_ID = "tracker-compare-bfm-holo-v3"
+RUN_ID = "tracker-compare-bfm-holo-v4"
 RUN_NAME = "tracker-compare-bfmzero-vs-holomotion"
 HERE = os.path.dirname(os.path.abspath(__file__))
 
@@ -94,17 +94,19 @@ blocks = [
     wr.H2(text="Per-clip videos"),
     wr.MarkdownBlock(text=(
         "Each video is one clip, three panels: **Reference | HoloMotion | BFM-Zero** (single "
-        "reference, no duplication).")),
+        "reference, no duplication). All four references are **physically grounded** (lowest body "
+        "within a few cm of the floor — verified by forward kinematics), so the reference itself is a "
+        "valid pose the robot could hold; only the trackers differ.")),
 ]
 
 for i, r in enumerate(rows, 1):
-    holo = "collapses to the floor" if r["holo_survival_rel"] < 0.3 else "loses the posture"
-    if r["bfm_survival_rel"] >= 0.99:
+    holo = "collapses to the floor" if r["holo_survival_rel"] < 0.45 else "loses the posture"
+    if r["bfm_joint_deg"] < 13:
         bfm = "tracks faithfully"
-    elif r["cid"] == "clip0":
-        bfm = "stays on its feet but tracks this extreme deep crouch only loosely (weakest of the four)"
+    elif r["bfm_joint_deg"] < 22:
+        bfm = "holds the posture (stable, tracks the low pose well)"
     else:
-        bfm = "stays stable on its feet"
+        bfm = "stays stable on its feet but tracks the exact pose only loosely"
     blocks += [
         wr.H3(text=f"{i}. {r['motion']}  —  HoloMotion {holo}; BFM-Zero {bfm}"),
         wr.MarkdownBlock(text=(
@@ -121,7 +123,7 @@ blocks += [
     wr.MarkdownBlock(text=(
         "Our original survival metric was **absolute**: fraction of frames the pelvis stays above a "
         "fixed 0.4 m. That is **too crude for legitimately-low motions** — a correct deep squat/crouch "
-        "reference pelvis dips to 0.27–0.58 m, so the metric flags a perfectly-tracked low posture as "
+        "reference pelvis dips to 0.20–0.42 m, so the metric flags a perfectly-tracked low posture as "
         "“fallen.” We added a **reference-relative** survival: fraction of frames the executed pelvis "
         "stays within 0.15 m *below the reference* pelvis (`executed_z > reference_z − 0.15`). It credits "
         "holding the intended posture and only penalizes an actual collapse. For standing motions the two "
