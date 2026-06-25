@@ -11,11 +11,13 @@ import wandb.apis.reports as wr
 
 from stage3_sim2sim.bfmzero_compare.large_section import large_blocks
 
+import sys
 ENTITY, PROJECT = "toddler_tracking", "g1-sim2sim"
 RUN_NAME = "scaled-tracker-comparison"
 HERE = os.path.dirname(os.path.abspath(__file__))
+TAG = sys.argv[1] if len(sys.argv) > 1 else "large"
 
-s = json.load(open(f"{HERE}/large_survival.json"))
+s = json.load(open(f"{HERE}/{TAG}_survival.json"))
 o = s["overall"]
 
 run = wandb.init(entity=ENTITY, project=PROJECT, name=RUN_NAME, id="scaled-tracker-comparison",
@@ -44,7 +46,7 @@ blocks = [
         f"BFM-Zero {o['bfm_rel']:.2f}**, BFM-Zero lower joint error on **{o['bfm_wins_joint']:.0%}** of "
         f"clips. Full root-cause analysis, per-clip videos, and the deployment/compute breakdown are in "
         f"the [companion report](https://wandb.ai/toddler_tracking/g1-sim2sim/reports/x--VmlldzoxNzMzOTg2Mg==).")),
-    *large_blocks(HERE, wr, runset=runset),
+    *large_blocks(HERE, wr, runset=runset, tag=TAG),
     wr.H2(text="Method"),
     wr.MarkdownBlock(text=(
         "Stratified sample via `build_large_sample.py`; BFM-Zero via a batched, GPU-shardable inference "

@@ -6,8 +6,8 @@ import json
 import os
 
 
-def large_blocks(here, wr, runset=None):
-    sp, ip = os.path.join(here, "large_survival.json"), os.path.join(here, "large_issues.json")
+def large_blocks(here, wr, runset=None, tag="large"):
+    sp, ip = os.path.join(here, f"{tag}_survival.json"), os.path.join(here, f"{tag}_issues.json")
     if not os.path.exists(sp):
         return []
     s = json.load(open(sp))
