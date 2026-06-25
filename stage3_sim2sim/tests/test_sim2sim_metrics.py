@@ -37,6 +37,32 @@ def test_survival_partial_fall():
     assert m["survival"] == pytest.approx(0.5, abs=0.02)
 
 
+def test_survival_rel_credits_low_reference():
+    """A perfectly-tracked deep squat (pelvis 0.30 m) is 'fallen' under the crude
+    absolute metric but fully alive under the reference-relative one."""
+    ref = _qpos(0.30)              # legit low reference (deep squat/crouch)
+    ex = ref.copy()               # tracked perfectly
+    m = rollout_metrics(ex, ref)
+    assert m["survival"] == 0.0           # absolute metric wrongly says fallen
+    assert m["survival_rel"] == 1.0       # reference-relative correctly says alive
+    assert m["root_z_mae"] == pytest.approx(0.0, abs=1e-9)
+
+
+def test_survival_rel_detects_collapse_below_low_reference():
+    """Collapsing well below a low reference is caught by the relative metric."""
+    ref = _qpos(0.45)
+    ex = _qpos(0.07)              # face-plant, far below ref - margin
+    m = rollout_metrics(ex, ref)
+    assert m["survival_rel"] == 0.0
+    assert m["root_z_mae"] == pytest.approx(0.38, abs=1e-6)
+
+
+def test_survival_rel_agrees_with_absolute_when_standing():
+    ex = _qpos(0.75)
+    m = rollout_metrics(ex, ex)
+    assert m["survival"] == 1.0 and m["survival_rel"] == 1.0
+
+
 def test_joint_rmse_known_offset():
     ref = _qpos(0.75)
     ex = ref.copy()

@@ -12,6 +12,7 @@ from pathlib import Path
 import numpy as np
 
 FALL_HEIGHT = 0.4  # root z below this = fallen (standing G1 pelvis ~0.75 m)
+REL_MARGIN = 0.15  # executed pelvis may sit this far below the REFERENCE pelvis before counting as fallen
 
 
 def build_qpos36_from_artifact(artifact_npz):
@@ -44,24 +45,42 @@ def build_hybrid_qpos36(decoded_features, original_qpos36, joint_slice=slice(12,
     return q
 
 
-def rollout_metrics(executed_qpos36, reference_qpos36, fall_height=FALL_HEIGHT):
-    """Score a HoloMotion rollout (executed vs reference qpos_36).
+def rollout_metrics(executed_qpos36, reference_qpos36, fall_height=FALL_HEIGHT,
+                    rel_margin=REL_MARGIN):
+    """Score a tracker rollout (executed vs reference qpos_36).
 
-    Returns survival (fraction of frames the pelvis stays above ``fall_height``),
-    min root height, joint tracking RMSE (deg), and root horizontal drift (m).
+    Two survival notions are returned:
+
+    * ``survival`` — absolute: fraction of frames the executed pelvis stays above a
+      fixed ``fall_height`` (0.4 m). Simple, but **too crude for legitimately-low
+      motions**: a correct deep squat/crouch reference pelvis dips to ~0.27-0.44 m,
+      so this metric flags it as "fallen" even when tracking is perfect.
+    * ``survival_rel`` — reference-relative: fraction of frames the executed pelvis
+      stays within ``rel_margin`` (0.15 m) **below the reference pelvis**, i.e.
+      ``executed_z > reference_z - rel_margin``. This credits holding the intended
+      (possibly low) posture and only penalizes an actual collapse, so it is the
+      fair survival metric for near-ground motion. For standing motions the two
+      agree; they diverge exactly where the absolute metric is misleading.
+
+    Also returns min/mean root height, joint tracking RMSE (deg), pelvis-height MAE
+    vs reference, and root horizontal drift (m).
     """
     ex = np.asarray(executed_qpos36, dtype=np.float64)
     ref = np.asarray(reference_qpos36, dtype=np.float64)
     n = min(len(ex), len(ref))
     ex, ref = ex[:n], ref[:n]
-    root_z = ex[:, 2]
+    root_z, ref_z = ex[:, 2], ref[:, 2]
     survival = float((root_z > fall_height).mean())
+    survival_rel = float((root_z > ref_z - rel_margin).mean())
     joint_rmse_deg = float(np.sqrt(np.mean((ex[:, 7:36] - ref[:, 7:36]) ** 2)) * 180 / np.pi)
     root_xy = np.linalg.norm(ex[:, :2] - ref[:, :2], axis=1)
     return {
         "survival": survival,
+        "survival_rel": survival_rel,
         "root_z_min": float(root_z.min()),
         "root_z_mean": float(root_z.mean()),
+        "ref_z_min": float(ref_z.min()),
+        "root_z_mae": float(np.abs(root_z - ref_z).mean()),
         "joint_rmse_deg": joint_rmse_deg,
         "root_xy_drift_mean": float(root_xy.mean()),
         "root_xy_drift_max": float(root_xy.max()),
