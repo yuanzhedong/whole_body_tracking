@@ -1,0 +1,37 @@
+{
+  "H1_init_ruled_out": {
+    "init_gap_mean_m": 0.0025,
+    "init_gap_max_abs_m": 0.0417
+  },
+  "H2_depth_driven": {
+    "corr_survival_vs_ref_pelvis_min": 0.721,
+    "n": 40
+  },
+  "H3_data_correct": {
+    "n_success_clips": 18,
+    "success_mean_joint_err_deg": 19.0,
+    "note": "on the clips it survives, HoloMotion tracks faithfully through the IDENTICAL pipeline -> the data feed is correct; wrong data (order/format) would break these too"
+  },
+  "H4_policy_not_physics": {
+    "deploy_law": "target = default_joint_pos + action_scale * action",
+    "rows": [
+      {
+        "clip": "squat_001__A360",
+        "upright_frame": 43,
+        "exec_pelvis_m": 0.431,
+        "left_knee_joint": {
+          "reference_deg": 143.0,
+          "commanded_deg": 49.0,
+          "achieved_deg": 83.0
+        },
+        "left_hip_pitch_joint": {
+          "reference_deg": -101.0,
+          "commanded_deg": -44.0,
+          "achieved_deg": -62.0
+        }
+      }
+    ],
+    "reading": "reference needs deep knee/hip flexion (~140-150deg knee); the policy COMMANDS far shallower targets (~45-85deg); the knee ACHIEVES >= commanded (gravity pulls it down further), so the actuator is NOT the limit -- the policy under-commands."
+  },
+  "conclusion": "HoloMotion's near-ground failure is an out-of-distribution POLICY capability gap. It initializes at the reference (H1), and on clips it survives it tracks faithfully through the identical feeding pipeline (H3) -> not a data error. Failure scales with posture depth (H2). Decisive (H4): under target=default+scale*action, the policy COMMANDS shallow knee/hip targets (~45-85deg) when the descent requires ~140-150deg, and the knee ACHIEVES at-or-beyond the command -> actuators are not torque-limited; the policy simply never outputs deep-flexion actions. It cannot lower the CoM into the crouch/squat, so it loses balance and collapses. Not wrong data, not a physics sag -- a policy that did not learn deep near-ground postures."
+}

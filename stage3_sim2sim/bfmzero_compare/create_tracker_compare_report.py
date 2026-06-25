@@ -104,6 +104,11 @@ if os.path.exists(QPATH):
         wr.MarkdownBlock(text=per_clip),
     ]
 
+from stage3_sim2sim.bfmzero_compare.seed_section import seed_survival_blocks
+seed_blocks = seed_survival_blocks(HERE, wr)
+from stage3_sim2sim.bfmzero_compare.rootcause_section import rootcause_blocks
+rc_blocks = rootcause_blocks(HERE, wr)
+
 
 blocks = [
     wr.H1(text="Tracker comparison: HoloMotion vs BFM-Zero on near-ground G1 motion"),
@@ -134,6 +139,8 @@ blocks = [
         "`joint°` = RMS joint tracking error vs reference. Both survival notions agree HoloMotion "
         "fails — so this is a real collapse, not a metric artifact.")),
 
+    *rc_blocks,
+    *seed_blocks,
     *quant_blocks,
 
     wr.H2(text="Per-clip videos"),

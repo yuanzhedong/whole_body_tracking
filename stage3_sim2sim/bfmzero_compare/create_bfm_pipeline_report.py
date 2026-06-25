@@ -67,6 +67,10 @@ def runset():
     return wr.Runset(entity=ENTITY, project=PROJECT, filters=f"display_name == '{RUN_NAME}'")
 
 
+from stage3_sim2sim.bfmzero_compare.seed_section import seed_survival_blocks
+seed_blocks = seed_survival_blocks(HERE, wr)
+
+
 blocks = [
     wr.H1(text="G1 motion pipeline: BONES-SEED → UniMoTok VAE → BFM-Zero sim2sim"),
     wr.MarkdownBlock(text=(
@@ -121,6 +125,8 @@ blocks = [
         "So validating the VAE with BFM-Zero (vs HoloMotion) confirms decoded **crouch/squat/sit** "
         "motion is executable — motion the HoloMotion-validated pipeline could not certify. The "
         "hardest cases for both remain exotic floor postures (cross-legged sit, crawl).")),
+
+    *seed_blocks,
 
     wr.H2(text="Method"),
     wr.MarkdownBlock(text=(
