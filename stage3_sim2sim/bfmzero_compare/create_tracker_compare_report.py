@@ -39,7 +39,7 @@ for r in rows:
     mp4 = os.path.join(HERE, f"triptych_{r['cid']}.mp4")
     if os.path.exists(mp4):
         media[vkey(r)] = wandb.Video(mp4, fps=30, format="mp4")
-for _dfk in ("deep_flexion_squat", "deep_flexion_crouch"):
+for _dfk in ("deep_flexion_squat", "deep_flexion_crouch", "depth_floor"):
     _df = os.path.join(HERE, f"{_dfk}.mp4")
     if os.path.exists(_df):
         media[_dfk] = wandb.Video(_df, fps=30, format="mp4")
@@ -109,7 +109,7 @@ if os.path.exists(QPATH):
     ]
 
 from stage3_sim2sim.bfmzero_compare.large_section import large_blocks
-seed_blocks = large_blocks(HERE, wr)   # 569-clip scaled comparison (supersedes the 40-clip seed sample)
+seed_blocks = large_blocks(HERE, wr, runset=runset)   # 569-clip scaled comparison (supersedes the 40-clip seed sample)
 from stage3_sim2sim.bfmzero_compare.rootcause_section import rootcause_blocks
 rc_blocks = rootcause_blocks(HERE, wr, runset=runset)
 from stage3_sim2sim.bfmzero_compare.compute_section import compute_blocks

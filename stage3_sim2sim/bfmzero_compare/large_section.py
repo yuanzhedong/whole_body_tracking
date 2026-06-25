@@ -6,7 +6,7 @@ import json
 import os
 
 
-def large_blocks(here, wr):
+def large_blocks(here, wr, runset=None):
     sp, ip = os.path.join(here, "large_survival.json"), os.path.join(here, "large_issues.json")
     if not os.path.exists(sp):
         return []
@@ -58,4 +58,11 @@ def large_blocks(here, wr):
             "clips) — out-of-distribution for either policy.\n"
             "- Net: BFM-Zero is the better near-ground validator by a wide margin, but it is not a "
             "universal oracle — extreme-low and inverted postures remain open.")),
-    ]
+    ] + ([
+        wr.MarkdownBlock(text=(
+            "**The depth floor, visualized** — `Reference (floor sit) | BFM-Zero`, live pelvis height. "
+            "The reference sits on the floor (~0.09 m); BFM-Zero stays balanced in a crouch (~0.5 m) and "
+            "never reaches the floor — stable, but not the lowest postures:")),
+        wr.PanelGrid(runsets=[runset()],
+                     panels=[wr.MediaBrowser(media_keys=["depth_floor"], num_columns=1)]),
+    ] if (runset and os.path.exists(os.path.join(here, "depth_floor.mp4"))) else [])
