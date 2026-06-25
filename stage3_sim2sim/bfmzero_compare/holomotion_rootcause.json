@@ -3,6 +3,17 @@
     "init_gap_mean_m": 0.0025,
     "init_gap_max_abs_m": 0.0417
   },
+  "bfm_zero_contrast": {
+    "clip": "squat_001__A360",
+    "tracking_rmse_deg": 11.3,
+    "deep_frame": 64,
+    "ref_pelvis_m": 0.272,
+    "reference_knee_deg": 151.0,
+    "bfm_achieved_knee_deg": 130.0,
+    "bfm_max_knee_deg": 132.0,
+    "holomotion_achieved_knee_deg": 80,
+    "note": "BFM-Zero achieves deep knee flexion (~130deg, tracking the reference within ~20deg at 11deg overall), where HoloMotion under-commands and stalls at ~80deg. So BFM-Zero DOES produce the deep near-ground flexion HoloMotion cannot."
+  },
   "H2_depth_driven": {
     "corr_survival_vs_ref_pelvis_min": 0.721,
     "n": 40

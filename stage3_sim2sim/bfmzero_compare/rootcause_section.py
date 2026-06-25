@@ -15,6 +15,7 @@ def rootcause_blocks(here, wr):
                       r["H3_data_correct"], r["H4_policy_not_physics"])
     k = h4["rows"][0]["left_knee_joint"]
     hip = h4["rows"][0]["left_hip_pitch_joint"]
+    bz = r.get("bfm_zero_contrast", {})
     tbl = (
         "| joint (squat descent, robot still upright) | reference needs | **policy commands** | achieved |\n"
         "|---|---|---|---|\n"
@@ -42,6 +43,18 @@ def rootcause_blocks(here, wr):
             "**commands only ~49°**; the knee actually *achieves more than commanded* (gravity pulls it "
             "down), so the actuator clearly **can** reach deeper — the policy simply never asks it to:")),
         wr.MarkdownBlock(text=tbl),
+    ] + ([
+        wr.MarkdownBlock(text=(
+            f"**Can BFM-Zero produce the deep flexion HoloMotion can't? Yes.** On the same squat, "
+            f"BFM-Zero bends the knee to **~{bz['bfm_achieved_knee_deg']:.0f}°** at the deepest frame "
+            f"(reference {bz['reference_knee_deg']:.0f}°, tracking it within ~20° at "
+            f"{bz['tracking_rmse_deg']:.0f}° overall), reaching {bz['bfm_max_knee_deg']:.0f}° over the "
+            f"clip — versus HoloMotion's ~{bz['holomotion_achieved_knee_deg']:.0f}°. That deep flexion "
+            "is exactly what lets BFM-Zero lower its center of mass into the squat and stay balanced:\n\n"
+            f"| squat, deepest frame | reference | HoloMotion | **BFM-Zero** |\n|---|---|---|---|\n"
+            f"| knee flexion | {bz['reference_knee_deg']:.0f}° | ~{bz['holomotion_achieved_knee_deg']:.0f}° "
+            f"(under-commands) | **~{bz['bfm_achieved_knee_deg']:.0f}°** |\n")),
+    ] if bz else []) + [
         wr.MarkdownBlock(text=(
             "**Conclusion.** The near-ground failure is an **out-of-distribution policy capability gap**: "
             "HoloMotion never learned to output deep near-ground joint targets, so it under-commands "
