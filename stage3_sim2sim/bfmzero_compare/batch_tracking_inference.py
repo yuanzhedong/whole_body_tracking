@@ -23,11 +23,13 @@ HV = Path(humanoidverse.__file__).parent
 
 
 def main(model_folder: Path, data_path: Path, out_dir: Path, device: str = "cuda",
-         simulator: str = "mujoco", max_steps: int = 1200, headless: bool = True):
+         simulator: str = "mujoco", max_steps: int = 1200, headless: bool = True,
+         start: int = 0, end: int = -1):
     model_folder, out_dir = Path(model_folder), Path(out_dir)
     out_dir.mkdir(parents=True, exist_ok=True)
     n_motions = len(joblib.load(data_path))
-    print(f"batch: {n_motions} motions -> {out_dir}")
+    end = n_motions if end < 0 else min(end, n_motions)
+    print(f"batch: motions [{start},{end}) of {n_motions} -> {out_dir}")
 
     model = load_model_from_checkpoint_dir(model_folder / "checkpoint", device=device)
     model.to(device).eval()
@@ -51,7 +53,7 @@ def main(model_folder: Path, data_path: Path, out_dir: Path, device: str = "cuda
     env_ids = torch.arange(1, dtype=torch.long)
 
     done = 0
-    for mid in range(n_motions):
+    for mid in range(start, end):
         out = out_dir / f"rollout_{mid}.npz"
         if out.exists():
             done += 1

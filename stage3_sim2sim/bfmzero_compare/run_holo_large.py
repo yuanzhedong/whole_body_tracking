@@ -11,9 +11,12 @@ OMG_ROOT = "/ws/user/yzdong/src/github/OMG"
 HERE = os.path.dirname(os.path.abspath(__file__))
 DST = f"{HERE}/large/holo"
 
+import sys
 man = json.load(open(f"{HERE}/large_sample.json"))
+start = int(sys.argv[1]) if len(sys.argv) > 1 else 0
+end = int(sys.argv[2]) if len(sys.argv) > 2 else len(man)
 done = 0
-for m in man:
+for m in man[start:end]:
     out = f"{DST}/holo_{m['idx']}.npz"
     if os.path.exists(out):
         done += 1
