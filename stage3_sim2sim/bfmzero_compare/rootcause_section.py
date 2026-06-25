@@ -22,7 +22,7 @@ def rootcause_blocks(here, wr, runset=None):
         f"| left knee | {k['reference_deg']:.0f}° | **{k['commanded_deg']:.0f}°** | {k['achieved_deg']:.0f}° |\n"
         f"| left hip pitch | {hip['reference_deg']:.0f}° | **{hip['commanded_deg']:.0f}°** | {hip['achieved_deg']:.0f}° |\n")
     return [
-        wr.H2(text="Root cause — why HoloMotion fails near-ground (it's the policy)"),
+        wr.H2(text="Root cause — why HoloMotion fails near-ground (policy + controller gains)"),
         wr.MarkdownBlock(text=(
             "We dug into *why* HoloMotion collapses on crouch/sit/squat, ruling hypotheses out with "
             "numbers from its own rollouts (analysis + tests committed: "
@@ -37,7 +37,7 @@ def rootcause_blocks(here, wr, runset=None):
             f"faithfully ({h3['success_mean_joint_err_deg']:.0f}° joint error) through the *identical* feeding "
             f"pipeline. Wrong joint order/format/scaling would break standing motion too — it doesn't.")),
         wr.MarkdownBlock(text=(
-            "**4. Decisive — the policy under-commands deep flexion (not a torque limit).** HoloMotion's "
+            "**4. A key policy factor — it under-commands deep flexion (not a torque limit).** HoloMotion's "
             "deploy law is `target = default_joint_pos + action_scale · action`. During the squat descent, "
             "while the robot is still upright, the reference needs the knee at ~143° but the policy "
             "**commands only ~49°**; the knee actually *achieves more than commanded* (gravity pulls it "
@@ -64,11 +64,29 @@ def rootcause_blocks(here, wr, runset=None):
                      panels=[wr.MediaBrowser(media_keys=["deep_flexion_squat", "deep_flexion_crouch"],
                                              num_columns=1)]),
     ] if (runset and os.path.exists(os.path.join(here, "deep_flexion_squat.mp4"))) else []) + [
+        wr.H3(text="Controlled test — it's the policy *and* the controller gains, not either alone"),
         wr.MarkdownBlock(text=(
-            "**Conclusion.** The near-ground failure is an **out-of-distribution policy capability gap**: "
-            "HoloMotion never learned to output deep near-ground joint targets, so it under-commands "
-            "flexion, can't lower its center of mass into the crouch/squat, and loses balance. It is "
-            "**not** a data-feeding error and **not** a passive physics/torque sag. BFM-Zero, trained as a "
-            "behavior-space foundation model, does command and hold these postures — which is why it "
-            "succeeds on the same references.")),
+            "The trackers are **not** run in byte-identical physics — they use different PD gains "
+            "(BFM-Zero: waist kp **300**, hip_pitch **99**; HoloMotion: waist **28.5**, hip_pitch **40**; "
+            "knee 99 and torque ±139 N·m are the same). We swapped gains both directions on near-ground "
+            "clips:\n\n"
+            "| | crouch survival_rel | squat survival_rel |\n|---|---|---|\n"
+            "| BFM-Zero, native gains | **1.00** | **1.00** |\n"
+            "| BFM-Zero forced onto HoloMotion's soft gains | 0.46 | 0.12 (collapses) |\n"
+            "| HoloMotion, native gains | 0.42 | 0.23 |\n"
+            "| HoloMotion given BFM-Zero's stiff gains | 0.61 | 0.23 (still fails) |\n")),
+        wr.MarkdownBlock(text=(
+            "**Conclusion (revised honestly).** The stiffer gains are **necessary** for BFM-Zero "
+            "(it collapses on HoloMotion's soft gains) but **not sufficient** for HoloMotion (it still "
+            "fails with BFM-Zero's stiff gains). So the near-ground gap is the **co-designed policy + "
+            "controller package**, not one factor alone:\n"
+            "- The **policy** matters: HoloMotion under-commands deep flexion (commands ~49° knee when "
+            "~143° is needed, and *achieves more than it commands* — so it's not torque-limited), and "
+            "stiff gains don't rescue it; BFM-Zero commands and reaches the deep posture.\n"
+            "- The **controller gains** matter: BFM-Zero's near-ground stability depends on its stiff "
+            "waist/hip gains; with HoloMotion's soft gains it collapses too.\n"
+            "It is **not** a data-feeding error (HoloMotion tracks standing well through the same pipeline), "
+            "and **not** a pure physics/torque issue (same ±139 N·m, achieves > commanded). The headline "
+            "survival numbers are valid as *each tracker as it is actually deployed* — but the advantage "
+            "should be read as a better policy+gain co-design, not a policy difference in isolation.")),
     ]

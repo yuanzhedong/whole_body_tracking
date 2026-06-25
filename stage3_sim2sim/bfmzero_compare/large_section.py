@@ -35,7 +35,7 @@ def large_blocks(here, wr, runset=None, tag="large"):
         wr.H2(text=f"Scaled comparison — {o['n']} clips across the seed distribution"),
         wr.MarkdownBlock(text=(
             f"We ran **both trackers on a stratified {o['n']}-clip sample** of the 142k-clip BONES-SEED "
-            "dataset (near-ground heavy + a standing baseline), full-clip rollouts, same physics, same "
+            "dataset (near-ground heavy + a standing baseline), full-clip rollouts (each tracker in its native MuJoCo G1 config — same robot, ±139 N·m limits; PD gains differ, see root cause), same "
             "metric. The result is unambiguous at scale:")),
         wr.MarkdownBlock(text=grp),
         wr.MarkdownBlock(text=(

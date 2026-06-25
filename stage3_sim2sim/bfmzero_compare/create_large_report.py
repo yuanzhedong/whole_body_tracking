@@ -41,7 +41,7 @@ blocks = [
     wr.MarkdownBlock(text=(
         f"A large-N test of the two G1 motion trackers as physics validators. We ran **both** on a "
         f"**{o['n']}-clip stratified sample** of the 142k-clip BONES-SEED dataset (near-ground heavy + a "
-        f"standing baseline), full-clip rollouts in identical MuJoCo physics, scored with the same "
+        f"standing baseline), full-clip rollouts (each in its native MuJoCo G1 config — same robot + ±139 N·m limits, but tracker-specific PD gains), scored with the same "
         f"`rollout_metrics`. **Headline: reference-relative survival HoloMotion {o['holo_rel']:.2f} vs "
         f"BFM-Zero {o['bfm_rel']:.2f}**, BFM-Zero lower joint error on **{o['bfm_wins_joint']:.0%}** of "
         f"clips. Full root-cause analysis, per-clip videos, and the deployment/compute breakdown are in "

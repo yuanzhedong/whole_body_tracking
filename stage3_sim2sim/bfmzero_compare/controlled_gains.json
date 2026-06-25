@@ -1,0 +1,11 @@
+{
+  "summary": "BFM-Zero's near-ground advantage is the co-designed policy + controller gains, not either alone.",
+  "gain_diff": {"waist_kp": {"bfm": 300, "holomotion": 28.5},
+                "hip_pitch_kp": {"bfm": 99, "holomotion": 40},
+                "knee_kp": {"bfm": 99, "holomotion": 99}, "torque_limit_Nm": {"both": 139}},
+  "bfm_native":      {"crouch": 1.00, "squat": 1.00, "squat2": 1.00},
+  "bfm_holo_gains":  {"crouch": 0.46, "squat": 0.12, "squat2": 0.14, "note": "collapses with HoloMotion's soft gains"},
+  "holo_native":     {"crouch": 0.42, "squat": 0.23},
+  "holo_bfm_gains":  {"crouch": 0.61, "squat": 0.23, "note": "still fails with BFM-Zero's stiff gains"},
+  "conclusion": "Gains are NECESSARY for BFM-Zero (collapses on soft gains) but NOT SUFFICIENT for HoloMotion (still fails on stiff gains). It is the policy+controller package, co-designed; neither factor alone explains the gap."
+}

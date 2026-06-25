@@ -95,7 +95,7 @@ if os.path.exists(QPATH):
         wr.MarkdownBlock(text=(
             f"Beyond the {len(rows)} featured clips above, we ran **every grounded** near-ground clip "
             "in the seed set (crouch / squat / sit / crawl — references with feet on the floor, "
-            "floating retargets excluded) through **both** trackers under identical physics and scored "
+            "floating retargets excluded) through **both** trackers (each in its native MuJoCo G1 config; same robot & torque limits, tracker-specific PD gains) and scored "
             "them with the same `rollout_metrics`. Aggregate (survival_rel = reference-relative survival; "
             "joint° = RMS tracking error):")),
         wr.MarkdownBlock(text=agg_tbl),
@@ -124,10 +124,13 @@ blocks = [
         "stratified sample of the 142k-clip dataset, reference-relative survival is **0.70 → 0.98** "
         "overall (near-ground **0.54 → 0.98**; crouch 0.15→0.96, squat 0.35→1.00, kneel 0.59→0.99), with "
         "BFM-Zero lower joint error on **97%** of clips.\n"
-        "- **Root cause = the policy, not data or physics.** HoloMotion initializes correctly and tracks "
-        "standing motion faithfully through the same pipeline, but its policy **under-commands deep knee "
-        "flexion** (commands ~49° when ~143° is needed; the knee *achieves more than commanded*, so it's "
-        "not torque-limited). **BFM-Zero commands and reaches the deep flexion (~130°).**\n"
+        "- **Root cause = co-designed policy + controller gains (not data; not one factor alone).** "
+        "HoloMotion's policy under-commands deep knee flexion (commands ~49° when ~143° is needed; it "
+        "*achieves more than commanded*, so not torque-limited). But a controlled gain-swap shows the "
+        "gains also matter: BFM-Zero collapses near-ground on HoloMotion's soft gains (waist kp 28.5), "
+        "while HoloMotion still fails on BFM-Zero's stiff gains (waist 300) — so the stiff gains are "
+        "**necessary** for BFM-Zero but **not sufficient** for HoloMotion. (It's not a data error: "
+        "HoloMotion tracks standing fine through the same pipeline.)\n"
         "- **Not a size issue:** HoloMotion is the *larger* model (408 M sparse-MoE vs 32 M); both run "
         "far above the 50 Hz control loop.\n"
         "- **BFM-Zero isn't an oracle either:** at scale it shows a pelvis **depth floor** (~0.35–0.40 m; "
