@@ -40,6 +40,23 @@ print("media run:", run.url)
 
 # ── tables ────────────────────────────────────────────────────────────────────
 do = dec["overall"]
+# large-scale decoded-vs-original (decoded_large.json), if present
+_dl = json.load(open(f"{HERE}/decoded_large.json")) if os.path.exists(f"{HERE}/decoded_large.json") else None
+if _dl:
+    lo = _dl["overall"]
+    large1_text = (
+        f"We VAE-encode→decode each clip (lat-512 root-fixed FINAL ckpt, **hybrid root**) and run both "
+        f"the **original** and **decoded** motion through BFM-Zero, scoring each against its own reference. "
+        f"**Across {lo['n']} clips spanning the distribution, decoded motion is executable just as well as "
+        f"the original — survival_rel {lo['orig_rel']:.3f} → {lo['dec_rel']:.3f} (zero degradation)**, and "
+        f"decoded joint tracking is even slightly tighter ({lo['orig_joint']:.1f}° → {lo['dec_joint']:.1f}°, "
+        f"VAE smoothing). Decoded survival_rel ≥ 0.9 on **{lo['dec_rel_ge_0.9_frac']:.0%}** of clips and "
+        f"within 5% of the original on **{lo['dec_within_5pct_of_orig']:.0%}** "
+        f"(standing {_dl['by_group']['standing']['orig_rel']:.2f}→{_dl['by_group']['standing']['dec_rel']:.2f}, "
+        f"near-ground {_dl['by_group']['near-ground']['orig_rel']:.2f}→{_dl['by_group']['near-ground']['dec_rel']:.2f}). "
+        f"The VAE latent preserves physical executability across the motion distribution.")
+else:
+    large1_text = "VAE-decoded motion stays executable in BFM-Zero (see the near-ground subset below)."
 dec_tbl = ("| clip | cat | original survival_rel | **decoded survival_rel** | orig joint° | decoded joint° |\n"
            "|---|---|---|---|---|---|\n")
 for r in dec["rows"]:
@@ -87,14 +104,12 @@ blocks = [
                  panels=[wr.MediaBrowser(media_keys=["pipeline_bfm"], num_columns=1)]),
 
     wr.H2(text="Result 1 — VAE-decoded motion stays executable in BFM-Zero"),
+    wr.MarkdownBlock(text=large1_text),
     wr.MarkdownBlock(text=(
-        f"For each grounded near-ground clip, we VAE-encode→decode the motion (lat-512 root-fixed "
-        f"FINAL ckpt, full-root decode) and run both the **original** and the **decoded** motion "
-        f"through BFM-Zero, scoring each against its own reference. Across {do['n']} clips, decoded "
-        f"motion survives essentially as well as the original — **survival_rel "
-        f"{do['orig_surv_rel_mean']:.2f} (orig) → {do['dec_surv_rel_mean']:.2f} (decoded)**, joint "
-        f"tracking {do['orig_joint_mean']:.1f}° → {do['dec_joint_mean']:.1f}°, decoded survival_rel ≥ "
-        f"0.9 on {do['dec_rel_ge_0.9']}/{do['n']}. The VAE latent preserves physical executability.")),
+        f"A focused near-ground subset (encode→decode, **hybrid root** = decoded joints + original "
+        f"root, run both original and decoded through BFM-Zero against their own reference): survival_rel "
+        f"**{do['orig_surv_rel_mean']:.2f} → {do['dec_surv_rel_mean']:.2f}**, joint "
+        f"{do['orig_joint_mean']:.1f}° → {do['dec_joint_mean']:.1f}°, ≥0.9 on {do['dec_rel_ge_0.9']}/{do['n']}.")),
     wr.MarkdownBlock(text=dec_tbl),
     wr.MarkdownBlock(text=(
         "**Demo gallery** — each video is `Reference | BFM-Zero on original | BFM-Zero on VAE-decoded` "

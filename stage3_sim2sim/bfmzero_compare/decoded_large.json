@@ -1,0 +1,23 @@
+{
+  "overall": {
+    "n": 430,
+    "orig_rel": 0.984,
+    "dec_rel": 0.984,
+    "orig_joint": 16.101,
+    "dec_joint": 14.446,
+    "dec_rel_ge_0.9_frac": 0.951,
+    "dec_within_5pct_of_orig": 0.972
+  },
+  "by_group": {
+    "standing": {
+      "n": 204,
+      "orig_rel": 0.989,
+      "dec_rel": 0.988
+    },
+    "near-ground": {
+      "n": 226,
+      "orig_rel": 0.981,
+      "dec_rel": 0.98
+    }
+  }
+}
