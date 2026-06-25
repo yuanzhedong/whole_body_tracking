@@ -3,18 +3,18 @@
   "overall": {
     "n": 9,
     "orig_surv_rel_mean": 0.982,
-    "dec_surv_rel_mean": 0.928,
+    "dec_surv_rel_mean": 0.973,
     "orig_surv_mean": 0.753,
-    "dec_surv_mean": 0.719,
+    "dec_surv_mean": 0.725,
     "orig_joint_mean": 16.144,
-    "dec_joint_mean": 17.456,
-    "dec_rel_ge_0.9": 7
+    "dec_joint_mean": 14.144,
+    "dec_rel_ge_0.9": 8
   },
   "by_category": {
     "crawl": {
       "n": 1,
       "orig_surv_rel": 0.84,
-      "dec_surv_rel": 0.715
+      "dec_surv_rel": 0.771
     },
     "crouch": {
       "n": 1,
@@ -24,12 +24,12 @@
     "sit": {
       "n": 3,
       "orig_surv_rel": 1.0,
-      "dec_surv_rel": 0.883
+      "dec_surv_rel": 1.0
     },
     "squat": {
       "n": 4,
       "orig_surv_rel": 1.0,
-      "dec_surv_rel": 0.996
+      "dec_surv_rel": 0.997
     }
   },
   "rows": [
@@ -41,9 +41,9 @@
       "orig_surv_rel": 1.0,
       "dec_surv_rel": 1.0,
       "orig_joint": 19.2,
-      "dec_joint": 16.8,
+      "dec_joint": 14.7,
       "orig_surv": 0.642,
-      "dec_surv": 0.645
+      "dec_surv": 0.487
     },
     {
       "idx": 1,
@@ -53,9 +53,9 @@
       "orig_surv_rel": 1.0,
       "dec_surv_rel": 1.0,
       "orig_joint": 11.3,
-      "dec_joint": 10.6,
+      "dec_joint": 10.1,
       "orig_surv": 0.938,
-      "dec_surv": 0.861
+      "dec_surv": 0.865
     },
     {
       "idx": 2,
@@ -63,11 +63,11 @@
       "cat": "squat",
       "label": "squat",
       "orig_surv_rel": 1.0,
-      "dec_surv_rel": 0.984,
+      "dec_surv_rel": 1.0,
       "orig_joint": 10.0,
-      "dec_joint": 12.2,
+      "dec_joint": 9.2,
       "orig_surv": 0.919,
-      "dec_surv": 0.929
+      "dec_surv": 0.895
     },
     {
       "idx": 3,
@@ -77,9 +77,9 @@
       "orig_surv_rel": 1.0,
       "dec_surv_rel": 1.0,
       "orig_joint": 15.2,
-      "dec_joint": 12.5,
+      "dec_joint": 11.6,
       "orig_surv": 0.911,
-      "dec_surv": 0.964
+      "dec_surv": 0.923
     },
     {
       "idx": 4,
@@ -87,9 +87,9 @@
       "cat": "squat",
       "label": "squat",
       "orig_surv_rel": 1.0,
-      "dec_surv_rel": 1.0,
+      "dec_surv_rel": 0.989,
       "orig_joint": 12.7,
-      "dec_joint": 13.9,
+      "dec_joint": 12.1,
       "orig_surv": 0.981,
       "dec_surv": 1.0
     },
@@ -99,11 +99,11 @@
       "cat": "sit",
       "label": "sit down on chair",
       "orig_surv_rel": 1.0,
-      "dec_surv_rel": 0.649,
+      "dec_surv_rel": 1.0,
       "orig_joint": 9.7,
-      "dec_joint": 19.1,
+      "dec_joint": 9.3,
       "orig_surv": 1.0,
-      "dec_surv": 0.679
+      "dec_surv": 1.0
     },
     {
       "idx": 6,
@@ -113,7 +113,7 @@
       "orig_surv_rel": 1.0,
       "dec_surv_rel": 1.0,
       "orig_joint": 9.7,
-      "dec_joint": 14.2,
+      "dec_joint": 9.7,
       "orig_surv": 1.0,
       "dec_surv": 1.0
     },
@@ -125,7 +125,7 @@
       "orig_surv_rel": 1.0,
       "dec_surv_rel": 1.0,
       "orig_joint": 31.4,
-      "dec_joint": 33.4,
+      "dec_joint": 26.0,
       "orig_surv": 0.0,
       "dec_surv": 0.0
     },
@@ -135,11 +135,11 @@
       "cat": "crawl",
       "label": "crawl",
       "orig_surv_rel": 0.84,
-      "dec_surv_rel": 0.715,
+      "dec_surv_rel": 0.771,
       "orig_joint": 26.1,
-      "dec_joint": 24.4,
+      "dec_joint": 24.6,
       "orig_surv": 0.387,
-      "dec_surv": 0.392
+      "dec_surv": 0.351
     }
   ]
 }

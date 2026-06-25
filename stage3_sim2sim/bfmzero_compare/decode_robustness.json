@@ -1,0 +1,143 @@
+{
+  "n_checked": 200,
+  "n_ok": 164,
+  "nan_inf": 0,
+  "joint_out_of_range": 0,
+  "root_drift": 72,
+  "recon_outlier": 0,
+  "too_short": 36,
+  "details": {
+    "nan_inf": [],
+    "joint_out_of_range": [],
+    "root_drift": [
+      {
+        "clip": "item_pick_up_crouch_walk_R_002__A354:v0",
+        "drift_m": 5.3
+      },
+      {
+        "clip": "crouch_ff_loop_315_004__A149_M:v0",
+        "drift_m": 1.11
+      },
+      {
+        "clip": "crouch_ff_start_180_R_003__A244:v0",
+        "drift_m": 3.72
+      },
+      {
+        "clip": "crouch_ff_stop_360_003__A147:v0",
+        "drift_m": 1.79
+      },
+      {
+        "clip": "crouch_ff_start_315_001__A149_M:v0",
+        "drift_m": 3.51
+      },
+      {
+        "clip": "crouch_ff_loop_360_R_002__A197:v0",
+        "drift_m": 5.84
+      },
+      {
+        "clip": "crouch_ff_stop_225_R_002__A198:v0",
+        "drift_m": 6.05
+      },
+      {
+        "clip": "crouch_ff_start_315_R_002__A194_M:v0",
+        "drift_m": 1.17
+      },
+      {
+        "clip": "crouch_ff_loop_315_003__A146:v0",
+        "drift_m": 1.85
+      },
+      {
+        "clip": "crouch_ff_start_225_001__A149:v0",
+        "drift_m": 4.86
+      },
+      {
+        "clip": "crouch_ff_stop_315_003__A146:v0",
+        "drift_m": 2.3
+      },
+      {
+        "clip": "crouch_ff_stop_225_R_006__A198_M:v0",
+        "drift_m": 4.8
+      },
+      {
+        "clip": "crouch_ff_start_315_002__A127_M:v0",
+        "drift_m": 0.55
+      },
+      {
+        "clip": "crouch_ff_loop_360_R_001__A244:v0",
+        "drift_m": 3.29
+      },
+      {
+        "clip": "crouch_ff_start_180_R_002__A147_M:v0",
+        "drift_m": 1.76
+      },
+      {
+        "clip": "crouch_ff_start_270_003__A148_M:v0",
+        "drift_m": 4.52
+      },
+      {
+        "clip": "crouch_ff_stop_180_R_003__A246:v0",
+        "drift_m": 3.47
+      },
+      {
+        "clip": "crouch_ff_loop_180_R_001__A145_M:v0",
+        "drift_m": 3.28
+      },
+      {
+        "clip": "crouch_ff_start_225_101__A125_M:v0",
+        "drift_m": 2.78
+      },
+      {
+        "clip": "crouch_ff_start_180_R_002__A244:v0",
+        "drift_m": 4.8
+      },
+      {
+        "clip": "crouch_ff_start_360_R_002__A248_M:v0",
+        "drift_m": 3.27
+      },
+      {
+        "clip": "crouch_ff_loop_270_R_003__A195_M:v0",
+        "drift_m": 8.51
+      },
+      {
+        "clip": "crouch_ff_stop_315_R_001__A248:v0",
+        "drift_m": 5.11
+      },
+      {
+        "clip": "crouch_turn_360_R_001__A244:v0",
+        "drift_m": 0.76
+      },
+      {
+        "clip": "crouch_ff_loop_180_R_001__A149:v0",
+        "drift_m": 3.97
+      }
+    ],
+    "recon_outlier": [],
+    "too_short": [
+      "crouch_operating_cupboard_low_out_R_003__A299_M:v0",
+      "crouch_ff_loop_315_R_001__A247:v0",
+      "crouch_operating_cupboard_low_out_R_003__A299:v0",
+      "crouch_ff_loop_225_R_002__A197_M:v0",
+      "turn_crouch_270_R_003__A194:v0",
+      "h_b_w_stand_to_crouch_270_stop_003__A342:v0",
+      "turn_crouch_360_R_001__A198_M:v0",
+      "crouch_operating_cupboard_low_in_R_001__A299:v0",
+      "crouch_turn_270_R_001__A244_M:v0",
+      "h_b_w_crouch_to_stand_270_stop_001__A342_M:v0",
+      "h_b_w_crouch_to_stand_270_stop_003__A344_M:v0",
+      "sitting_legs_bend_arms_front_start_001__A188:v0",
+      "sit_cross_legged_stop_003__A246:v0",
+      "sit_cross_legged_stop_002__A099_M:v0",
+      "sitting_legs_bend_arms_front_start_004__A245:v0",
+      "sitting_legs_cross_arm_side_loop_005__A246:v0",
+      "sit_cross_legged_stop_001__A051:v0",
+      "sit_on_heels_stop_002__A164:v0",
+      "sitting_legs_cross_arm_side_stop_006__A184_M:v0",
+      "sitting_legs_bend_arms_front_start_003__A187_M:v0",
+      "sitting_legs_bend_arms_front_stop_R_002__A414_M:v0",
+      "sitting_legs_bend_arms_back_stop_001__A036:v0",
+      "sit_on_chair_start_R_003__A167_M:v0",
+      "sit_on_heels_stop_R_003__A189_M:v0",
+      "sitting_legs_cross_arms_front_stop_002__A189_M:v0"
+    ]
+  }
+}

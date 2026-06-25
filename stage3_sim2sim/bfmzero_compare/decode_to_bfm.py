@@ -9,7 +9,7 @@ import os
 import numpy as np
 import joblib
 
-from stage3_sim2sim.sim2sim import build_qpos36_from_artifact
+from stage3_sim2sim.sim2sim import build_qpos36_from_artifact, build_hybrid_qpos36
 from stage3_sim2sim.decode_to_qpos36 import qpos36_to_features, features_to_qpos36
 from stage3_sim2sim.vae_decode_clip import load_vae, decode_features
 from stage3_sim2sim.joint_order import qpos36_feature_to_omg
@@ -36,7 +36,10 @@ def main():
             print(f"[{idx}] too short ({qpos_gt.shape[0]}<{ws}), skip"); continue
         feats = qpos36_to_features(qpos_gt, 1 / 30)
         rec = decode_features(model, feats, mean, std, device="cpu")
-        decoded = features_to_qpos36(rec, 1 / 30, root_pos0_zup=qpos_gt[0, :3])  # full root, FEATURE
+        # HYBRID root (decoded joints + original root): the full-root integration drifts
+        # horizontally (>0.5 m on ~44% of clips, the known double-yup issue) -- decode_robustness.json.
+        # Hybrid isolates the VAE's job (the joints) and matches the HoloMotion sim2sim.
+        decoded = build_hybrid_qpos36(rec, qpos_gt)
         dec_omg = qpos36_feature_to_omg(decoded)
         name = art.replace(":", "_")
         out[name] = qpos36_omg_to_bfmzero_motion(dec_omg, fps=30)

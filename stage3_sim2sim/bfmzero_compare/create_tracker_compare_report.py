@@ -108,8 +108,8 @@ if os.path.exists(QPATH):
         wr.MarkdownBlock(text=per_clip),
     ]
 
-from stage3_sim2sim.bfmzero_compare.seed_section import seed_survival_blocks
-seed_blocks = seed_survival_blocks(HERE, wr)
+from stage3_sim2sim.bfmzero_compare.large_section import large_blocks
+seed_blocks = large_blocks(HERE, wr)   # 569-clip scaled comparison (supersedes the 40-clip seed sample)
 from stage3_sim2sim.bfmzero_compare.rootcause_section import rootcause_blocks
 rc_blocks = rootcause_blocks(HERE, wr, runset=runset)
 from stage3_sim2sim.bfmzero_compare.compute_section import compute_blocks
@@ -120,15 +120,18 @@ blocks = [
     wr.H1(text="Tracker comparison: HoloMotion vs BFM-Zero on near-ground G1 motion"),
     wr.MarkdownBlock(text=(
         "**TL;DR**\n"
-        "- **HoloMotion collapses on near-ground motion (crouch/sit/squat); BFM-Zero holds it.** On a "
-        "40-clip seed sample, reference-relative survival is **0.65 → 0.98** overall (near-ground "
-        "**0.37 → 0.96**), with BFM-Zero lower joint error on every grounded near-ground clip.\n"
+        "- **HoloMotion collapses on near-ground motion; BFM-Zero holds it.** Across a **569-clip** "
+        "stratified sample of the 142k-clip dataset, reference-relative survival is **0.70 → 0.98** "
+        "overall (near-ground **0.54 → 0.98**; crouch 0.15→0.96, squat 0.35→1.00, kneel 0.59→0.99), with "
+        "BFM-Zero lower joint error on **97%** of clips.\n"
         "- **Root cause = the policy, not data or physics.** HoloMotion initializes correctly and tracks "
         "standing motion faithfully through the same pipeline, but its policy **under-commands deep knee "
         "flexion** (commands ~49° when ~143° is needed; the knee *achieves more than commanded*, so it's "
         "not torque-limited). **BFM-Zero commands and reaches the deep flexion (~130°).**\n"
         "- **Not a size issue:** HoloMotion is the *larger* model (408 M sparse-MoE vs 32 M); both run "
         "far above the 50 Hz control loop.\n"
+        "- **BFM-Zero isn't an oracle either:** at scale it shows a pelvis **depth floor** (~0.35–0.40 m; "
+        "can't reach floor-sitting) and, like HoloMotion, fails inverted poses (handstands).\n"
         "- **Method:** we run our exact clips through BFM-Zero with no SMPL / no reverse-retarget, and "
         "score both trackers with the same metric.")),
     wr.MarkdownBlock(text=(
