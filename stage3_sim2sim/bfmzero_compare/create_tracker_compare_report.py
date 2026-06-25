@@ -1,7 +1,8 @@
 """Build the HoloMotion vs BFM-Zero tracker-comparison W&B report (toddler_tracking).
 
-Per-clip layout: one combined 2x2 video (top = Reference|HoloMotion, bottom =
-Reference|BFM-Zero) so the contrast is obvious at a glance. Re-run to refresh.
+Layout: pipeline diagram (each tracker's input) -> summary table -> per-clip
+triptych videos (Reference | HoloMotion | BFM-Zero, single reference). Re-run to
+refresh.
     OMG/.venv-cu128/bin/python stage3_sim2sim/bfmzero_compare/create_tracker_compare_report.py
 """
 import json
@@ -11,33 +12,33 @@ import wandb.apis.reports as wr
 
 ENTITY = "toddler_tracking"
 PROJECT = "g1-sim2sim"
-RUN_ID = "tracker-compare-bfm-holo-v2"
+RUN_ID = "tracker-compare-bfm-holo-v3"
+RUN_NAME = "tracker-compare-bfmzero-vs-holomotion"
 HERE = os.path.dirname(os.path.abspath(__file__))
 
 rows = json.load(open(os.path.join(HERE, "bfmzero_vs_holomotion.json")))
 
 
-def key(r):
+def vkey(r):
     return f"{r['cid']}__{r['motion'].replace(' ', '_').replace('(', '').replace(')', '')}"
 
 
 # ── 1. media + table run ──────────────────────────────────────────────────────
-run = wandb.init(entity=ENTITY, project=PROJECT,
-                 name="tracker-compare-bfmzero-vs-holomotion",
+run = wandb.init(entity=ENTITY, project=PROJECT, name=RUN_NAME,
                  id=RUN_ID, resume="allow", job_type="analysis", reinit=True)
 
 tbl = wandb.Table(columns=[
     "clip", "motion", "ref pelvis min (m)",
     "HoloMotion survival", "HoloMotion survival_rel", "HoloMotion joint°",
     "BFM-Zero survival", "BFM-Zero survival_rel", "BFM-Zero joint°"])
-media = {}
+media = {"pipeline": wandb.Image(os.path.join(HERE, "pipeline.png"))}
 for r in rows:
     tbl.add_data(r["clip"], r["motion"], r["ref_z_min"],
                  r["holo_survival"], r["holo_survival_rel"], r["holo_joint_deg"],
                  r["bfm_survival"], r["bfm_survival_rel"], r["bfm_joint_deg"])
-    mp4 = os.path.join(HERE, f"combined_{r['cid']}.mp4")
+    mp4 = os.path.join(HERE, f"triptych_{r['cid']}.mp4")
     if os.path.exists(mp4):
-        media[key(r)] = wandb.Video(mp4, fps=30, format="mp4")
+        media[vkey(r)] = wandb.Video(mp4, fps=30, format="mp4")
 
 run.log({"comparison_table": tbl, **media})
 run.finish()
@@ -58,7 +59,7 @@ for r in rows:
 
 def runset():
     return wr.Runset(entity=ENTITY, project=PROJECT,
-                     filters=f"display_name == 'tracker-compare-bfmzero-vs-holomotion'")
+                     filters=f"display_name == '{RUN_NAME}'")
 
 
 blocks = [
@@ -72,8 +73,17 @@ blocks = [
         "(LeCAR-Lab promptable Forward-Backward foundation model, arXiv 2511.04131) — in the same "
         "MuJoCo physics.\n\n"
         "**Answer: it is HoloMotion-specific.** On identical clips, BFM-Zero survives 0.80–1.00 with "
-        "3–4× lower joint error. Watch any clip below: same reference (left), HoloMotion falls (top "
-        "right), BFM-Zero holds the posture (bottom right).")),
+        "3–4× lower joint error.")),
+
+    wr.H2(text="Pipeline — what each tracker receives"),
+    wr.MarkdownBlock(text=(
+        "Both trackers are driven by the **same** reference G1 clip (`qpos_36` = root pose + 29 joint "
+        "angles); only the *input format* differs. HoloMotion consumes it as its 522-d tracking "
+        "observation (FEATURE joint order); BFM-Zero encodes it into its Forward-Backward latent `z` "
+        "(reference dof → robot-axis-angle `pose_aa`, OMG joint order). Same MuJoCo G1 physics, same "
+        "scoring.")),
+    wr.PanelGrid(runsets=[runset()],
+                 panels=[wr.MediaBrowser(media_keys=["pipeline"], num_columns=1)]),
 
     wr.H2(text="Summary"),
     wr.MarkdownBlock(text=md_table + (
@@ -83,13 +93,18 @@ blocks = [
 
     wr.H2(text="Per-clip videos"),
     wr.MarkdownBlock(text=(
-        "Each video is one clip, 2×2: **top row = Reference | HoloMotion**, "
-        "**bottom row = Reference | BFM-Zero**. Same reference motion on both left panels.")),
+        "Each video is one clip, three panels: **Reference | HoloMotion | BFM-Zero** (single "
+        "reference, no duplication).")),
 ]
 
 for i, r in enumerate(rows, 1):
     holo = "collapses to the floor" if r["holo_survival_rel"] < 0.3 else "loses the posture"
-    bfm = "tracks faithfully" if r["bfm_survival_rel"] >= 0.99 else "stays stable on its feet"
+    if r["bfm_survival_rel"] >= 0.99:
+        bfm = "tracks faithfully"
+    elif r["cid"] == "clip0":
+        bfm = "stays on its feet but tracks this extreme deep crouch only loosely (weakest of the four)"
+    else:
+        bfm = "stays stable on its feet"
     blocks += [
         wr.H3(text=f"{i}. {r['motion']}  —  HoloMotion {holo}; BFM-Zero {bfm}"),
         wr.MarkdownBlock(text=(
@@ -98,7 +113,7 @@ for i, r in enumerate(rows, 1):
             f"joint error: **{r['holo_joint_deg']:.1f}°** vs **{r['bfm_joint_deg']:.1f}°**  ·  "
             f"reference pelvis dips to {r['ref_z_min']:.2f} m")),
         wr.PanelGrid(runsets=[runset()],
-                     panels=[wr.MediaBrowser(media_keys=[key(r)], num_columns=1)]),
+                     panels=[wr.MediaBrowser(media_keys=[vkey(r)], num_columns=1)]),
     ]
 
 blocks += [
@@ -121,10 +136,10 @@ blocks += [
         "(row 0 = root rotvec; rows 1..29 = `dof[j] · joint_axis`) and `fps`; it derives dof, velocities "
         "and body FK itself. So **no reverse-retargeting / no SMPL** was needed — we convert our "
         "already-retargeted G1 qpos directly (joints reordered FEATURE→OMG to match BFM-Zero's XML). "
-        "Both trackers are scored with the same `rollout_metrics`. All videos use the same OMG MuJoCo "
+        "Both trackers are scored with the same `rollout_metrics`; all videos use the same OMG MuJoCo "
         "renderer. Code: `stage3_sim2sim/to_bfmzero_motion.py`, `bfmzero_compare/` "
-        "(`render_holomotion_compare.py`, `render_bfm_omg.py`, `rescore.py`, this script), "
-        "`bfmzero_tracking_inference.patch`.")),
+        "(`render_holomotion_compare.py`, `render_bfm_omg.py`, `render_triptych.py`, "
+        "`make_pipeline_diagram.py`, `rescore.py`, this script), `bfmzero_tracking_inference.patch`.")),
 ]
 
 report = wr.Report(entity=ENTITY, project=PROJECT,
