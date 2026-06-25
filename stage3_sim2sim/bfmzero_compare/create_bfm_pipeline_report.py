@@ -42,6 +42,13 @@ for c, a in quant["by_category"].items():
     ng_tbl += (f"| {c} | {a['n']} | {a['holo_rel_mean']:.2f} | **{a['bfm_rel_mean']:.2f}** | "
                f"{a['holo_joint_mean']:.1f} | **{a['bfm_joint_mean']:.1f}** |\n")
 
+ng_per_clip = ("| clip | cat | ref pelvis min | HoloMotion surv/rel/joint° | **BFM-Zero surv/rel/joint°** |\n"
+               "|---|---|---|---|---|\n")
+for r in quant["rows"]:
+    ng_per_clip += (f"| `{r['clip']}` | {r['cat']} | {r['ref_z_min']:.2f} m | "
+                    f"{r['holo_surv']:.2f} / {r['holo_rel']:.2f} / {r['holo_joint']:.1f} | "
+                    f"**{r['bfm_surv']:.2f} / {r['bfm_rel']:.2f} / {r['bfm_joint']:.1f}** |\n")
+
 
 def runset():
     return wr.Runset(entity=ENTITY, project=PROJECT, filters=f"display_name == '{RUN_NAME}'")
@@ -80,6 +87,12 @@ blocks = [
         "[Tracker comparison report](https://wandb.ai/toddler_tracking/g1-sim2sim/reports/"
         "x--VmlldzoxNzMzNDI0MA==)). Aggregate (survival_rel = reference-relative survival):")),
     wr.MarkdownBlock(text=ng_tbl),
+    wr.MarkdownBlock(text=(
+        f"BFM-Zero has lower joint error on **{qo['bfm_wins_joint']}/{qo['n']}** clips and holds the "
+        f"posture (survival_rel ≥ 0.9) on **{qo['bfm_rel_ge_0.9']}/{qo['n']}** vs HoloMotion's "
+        f"**{qo['holo_rel_ge_0.9']}/{qo['n']}**. Per-clip detail (every grounded near-ground seed clip, "
+        "both trackers, original references):")),
+    wr.MarkdownBlock(text=ng_per_clip),
     wr.MarkdownBlock(text=(
         "So validating the VAE with BFM-Zero (vs HoloMotion) confirms decoded **crouch/squat/sit** "
         "motion is executable — motion the HoloMotion-validated pipeline could not certify. The "
