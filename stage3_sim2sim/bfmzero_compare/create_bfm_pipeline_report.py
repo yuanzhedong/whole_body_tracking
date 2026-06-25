@@ -21,7 +21,12 @@ quant = json.load(open(f"{HERE}/quant_analysis.json"))
 # ── media run ─────────────────────────────────────────────────────────────────
 run = wandb.init(entity=ENTITY, project=PROJECT, name=RUN_NAME,
                  id="bfm-pipeline-diagram", resume="allow", job_type="analysis", reinit=True)
-run.log({"pipeline_bfm": wandb.Image(f"{HERE}/pipeline_bfm.png")})
+media = {"pipeline_bfm": wandb.Image(f"{HERE}/pipeline_bfm.png")}
+if os.path.exists(f"{HERE}/pipeline_crouch.mp4"):
+    media["crouch_pipeline"] = wandb.Video(f"{HERE}/pipeline_crouch.mp4", fps=30, format="mp4")
+if os.path.exists(f"{HERE}/triptych_clip0.mp4"):
+    media["crouch_vs_holomotion"] = wandb.Video(f"{HERE}/triptych_clip0.mp4", fps=30, format="mp4")
+run.log(media)
 run.finish()
 print("media run:", run.url)
 
@@ -79,6 +84,11 @@ blocks = [
         f"tracking {do['orig_joint_mean']:.1f}° → {do['dec_joint_mean']:.1f}°, decoded survival_rel ≥ "
         f"0.9 on {do['dec_rel_ge_0.9']}/{do['n']}. The VAE latent preserves physical executability.")),
     wr.MarkdownBlock(text=dec_tbl),
+    wr.MarkdownBlock(text=(
+        "**Deep crouch** — `Reference | BFM-Zero on original | BFM-Zero on VAE-decoded`. BFM-Zero "
+        "executes the VAE-reconstructed deep crouch just like the original:")),
+    wr.PanelGrid(runsets=[runset()],
+                 panels=[wr.MediaBrowser(media_keys=["crouch_pipeline"], num_columns=1)]),
 
     wr.H2(text="Result 2 — BFM-Zero extends physics coverage to near-ground motion"),
     wr.MarkdownBlock(text=(
@@ -93,6 +103,11 @@ blocks = [
         f"**{qo['holo_rel_ge_0.9']}/{qo['n']}**. Per-clip detail (every grounded near-ground seed clip, "
         "both trackers, original references):")),
     wr.MarkdownBlock(text=ng_per_clip),
+    wr.MarkdownBlock(text=(
+        "**Deep crouch** — `Reference | HoloMotion | BFM-Zero` (original references). HoloMotion "
+        "collapses to the floor; BFM-Zero holds the crouch:")),
+    wr.PanelGrid(runsets=[runset()],
+                 panels=[wr.MediaBrowser(media_keys=["crouch_vs_holomotion"], num_columns=1)]),
     wr.MarkdownBlock(text=(
         "So validating the VAE with BFM-Zero (vs HoloMotion) confirms decoded **crouch/squat/sit** "
         "motion is executable — motion the HoloMotion-validated pipeline could not certify. The "
