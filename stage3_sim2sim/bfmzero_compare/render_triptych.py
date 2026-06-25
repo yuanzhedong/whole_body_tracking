@@ -17,9 +17,10 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 ART = "/scratch/user/yzdong/OMG-Data/raw/bones_seed/artifacts_seed_full"
 FFMPEG = "/usr/bin/ffmpeg"
 CLIPS = [
-    # only the two replaced (grounded) clips; clip2/clip3 triptychs are unchanged
     ("clip0", "crouch_ff_start_180_R_003__A145_M:v0"),
     ("clip1", "squat_002__A359:v0"),
+    ("clip2", "sit_on_chair_stop_R_001__A047:v0"),
+    ("clip3", "squat_001__A360:v0"),
 ]
 
 
@@ -34,7 +35,9 @@ def holo_rollout(cid):
 for cid, art in CLIPS:
     ref = qpos36_feature_to_omg(build_qpos36_from_artifact(f"{ART}/{art}/motion.npz"))
     n = len(ref)
-    holo_ex = np.load(holo_rollout(cid))["executed_qpos_36"][:n]
+    # HoloMotion rollout executed is in FEATURE order -> reorder to OMG for the renderer
+    # (G1Kinematics expects OMG order). BFM-Zero executed is already OMG -> render raw.
+    holo_ex = qpos36_feature_to_omg(resample(np.load(holo_rollout(cid))["executed_qpos_36"], n))
     bfm_ex = resample(np.load(f"{HERE}/rollout_{cid}.npz")["executed_qpos_36"], n)
 
     panels = []

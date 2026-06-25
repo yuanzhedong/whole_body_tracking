@@ -28,7 +28,8 @@ for cid, art, desc in CLIPS:
     q = build_qpos36_from_artifact(f"{ART}/{art}/motion.npz")     # FEATURE order
     roll = run_tracker(q, 30, f"/tmp/holo_{cid}", ONNX, OMG_ROOT, num_frames=q.shape[0])
     d = np.load(roll)
-    ex = d["executed_qpos_36"]                                     # OMG/MuJoCo order
+    # HoloMotion rollout executed is FEATURE order -> reorder to OMG for the renderer
+    ex = qpos36_feature_to_omg(d["executed_qpos_36"])
     ref_omg = qpos36_feature_to_omg(q)[:len(ex)]                   # reorder ref for renderer
     mp4 = f"{OUT}/holo_{cid}.mp4"
     render_qpos_comparison_video(ref_omg, ex, mp4, fps=30,
