@@ -10,12 +10,17 @@ import subprocess
 import numpy as np
 
 from stage3_sim2sim.sim2sim import build_qpos36_from_artifact
-from stage3_sim2sim.joint_order import qpos36_feature_to_omg
+from stage3_sim2sim.joint_order import qpos36_feature_to_omg, OMG_ORDER
 from omg.render.mujoco import render_qpos_video
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ART = "/scratch/user/yzdong/OMG-Data/raw/bones_seed/artifacts_seed_full"
 FFMPEG = "/usr/bin/ffmpeg"
+LK = 7 + OMG_ORDER.index("left_knee_joint")   # all panels are OMG order here
+
+
+def knee_lines(q):
+    return [[f"L-knee flexion: {abs(np.degrees(q[f, LK])):3.0f} deg"] for f in range(len(q))]
 CLIPS = [
     ("clip0", "crouch_ff_start_180_R_003__A145_M:v0"),
     ("clip1", "squat_002__A359:v0"),
@@ -44,7 +49,8 @@ for cid, art in CLIPS:
     for tag, q, title in [("ref", ref, "Reference"), ("holo", holo_ex, "HoloMotion"),
                           ("bfm", bfm_ex, "BFM-Zero")]:
         p = f"{HERE}/_panel_{cid}_{tag}.mp4"
-        render_qpos_video(q[:n], p, fps=30, width=640, height=720, title=title)
+        render_qpos_video(q[:n], p, fps=30, width=640, height=720, title=title,
+                          per_frame_info_lines=knee_lines(q[:n]))
         panels.append(p)
 
     out = f"{HERE}/triptych_{cid}.mp4"
