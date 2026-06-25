@@ -204,7 +204,14 @@ blocks += [
         "holding the intended posture and only penalizes an actual collapse. For standing motions the two "
         "agree; they diverge exactly where the absolute metric misleads. Implemented in "
         "`stage3_sim2sim/sim2sim.py::rollout_metrics` (`survival_rel`), with unit tests. Note both metrics "
-        "still rank HoloMotion as failing here — the near-ground collapse is genuine.")),
+        "still rank HoloMotion as failing here — the near-ground collapse is genuine.\n\n"
+        "*One known limitation:* for **floor-level references** (pelvis < ~0.15 m, e.g. cross-legged "
+        "floor sitting) the relative threshold `reference_z − 0.15` goes near/below zero, so survival_rel "
+        "saturates to ~1.0 for *any* non-collapsing pose — there a tracker that barely moves can score "
+        "high while tracking poorly. **Joint error is the honest discriminator at floor level** (we report "
+        "it alongside survival), which is why the scaled tables include it. This is the one case where "
+        "BFM-Zero's survival_rel dips below HoloMotion's despite BFM tracking the pose better (lower joint "
+        "error).")),
 
     wr.H2(text="Method — running our G1 clips through BFM-Zero"),
     wr.MarkdownBlock(text=(
