@@ -43,5 +43,9 @@ _build
 *.zarr
 *.npz
 
+# rendered media (logged to W&B, not committed)
+*.mp4
+stage3_sim2sim/bfmzero_compare/*.png
+
 **/assets/
 artifacts/
