@@ -6,7 +6,7 @@ import json
 import os
 
 
-def rootcause_blocks(here, wr):
+def rootcause_blocks(here, wr, runset=None):
     path = os.path.join(here, "holomotion_rootcause.json")
     if not os.path.exists(path):
         return []
@@ -54,7 +54,14 @@ def rootcause_blocks(here, wr):
             f"| squat, deepest frame | reference | HoloMotion | **BFM-Zero** |\n|---|---|---|---|\n"
             f"| knee flexion | {bz['reference_knee_deg']:.0f}° | ~{bz['holomotion_achieved_knee_deg']:.0f}° "
             f"(under-commands) | **~{bz['bfm_achieved_knee_deg']:.0f}°** |\n")),
-    ] if bz else []) + [
+    ] if bz else []) + ([
+        wr.MarkdownBlock(text=(
+            "**See it** — `Reference | HoloMotion | BFM-Zero` with the live left-knee flexion on each "
+            "panel. As the squat deepens the reference knee bends to ~150°; BFM-Zero follows (~130°, "
+            "deep squat) while HoloMotion stalls (~80°, sprawls and collapses):")),
+        wr.PanelGrid(runsets=[runset()],
+                     panels=[wr.MediaBrowser(media_keys=["deep_flexion_squat"], num_columns=1)]),
+    ] if (runset and os.path.exists(os.path.join(here, "deep_flexion_squat.mp4"))) else []) + [
         wr.MarkdownBlock(text=(
             "**Conclusion.** The near-ground failure is an **out-of-distribution policy capability gap**: "
             "HoloMotion never learned to output deep near-ground joint targets, so it under-commands "

@@ -39,6 +39,9 @@ for r in rows:
     mp4 = os.path.join(HERE, f"triptych_{r['cid']}.mp4")
     if os.path.exists(mp4):
         media[vkey(r)] = wandb.Video(mp4, fps=30, format="mp4")
+_df = os.path.join(HERE, "deep_flexion_squat.mp4")
+if os.path.exists(_df):
+    media["deep_flexion_squat"] = wandb.Video(_df, fps=30, format="mp4")
 
 run.log({"comparison_table": tbl, **media})
 run.finish()
@@ -107,7 +110,7 @@ if os.path.exists(QPATH):
 from stage3_sim2sim.bfmzero_compare.seed_section import seed_survival_blocks
 seed_blocks = seed_survival_blocks(HERE, wr)
 from stage3_sim2sim.bfmzero_compare.rootcause_section import rootcause_blocks
-rc_blocks = rootcause_blocks(HERE, wr)
+rc_blocks = rootcause_blocks(HERE, wr, runset=runset)
 from stage3_sim2sim.bfmzero_compare.compute_section import compute_blocks
 comp_blocks = compute_blocks(wr)
 
