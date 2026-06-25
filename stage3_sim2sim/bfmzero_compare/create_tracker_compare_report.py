@@ -62,6 +62,49 @@ def runset():
                      filters=f"display_name == '{RUN_NAME}'")
 
 
+# ── optional quantitative-analysis section (all grounded near-ground clips) ────
+quant_blocks = []
+QPATH = os.path.join(HERE, "quant_analysis.json")
+if os.path.exists(QPATH):
+    qa = json.load(open(QPATH))
+    o = qa["overall"]
+    agg_tbl = (
+        "| group | n | HoloMotion survival_rel | **BFM-Zero survival_rel** | "
+        "HoloMotion joint° (mean/med) | **BFM-Zero joint° (mean/med)** |\n"
+        "|---|---|---|---|---|---|\n"
+        f"| **all** | {o['n']} | {o['holo_rel_mean']:.2f} | **{o['bfm_rel_mean']:.2f}** | "
+        f"{o['holo_joint_mean']:.1f} / {o['holo_joint_med']:.1f} | "
+        f"**{o['bfm_joint_mean']:.1f} / {o['bfm_joint_med']:.1f}** |\n")
+    for c, a in qa["by_category"].items():
+        agg_tbl += (f"| {c} | {a['n']} | {a['holo_rel_mean']:.2f} | **{a['bfm_rel_mean']:.2f}** | "
+                    f"{a['holo_joint_mean']:.1f} / {a['holo_joint_med']:.1f} | "
+                    f"**{a['bfm_joint_mean']:.1f} / {a['bfm_joint_med']:.1f}** |\n")
+    per_clip = (
+        "| clip | cat | ref pelvis min | HoloMotion surv/rel/joint° | **BFM-Zero surv/rel/joint°** |\n"
+        "|---|---|---|---|---|\n")
+    for r in qa["rows"]:
+        per_clip += (f"| `{r['clip']}` | {r['cat']} | {r['ref_z_min']:.2f} m | "
+                     f"{r['holo_surv']:.2f} / {r['holo_rel']:.2f} / {r['holo_joint']:.1f} | "
+                     f"**{r['bfm_surv']:.2f} / {r['bfm_rel']:.2f} / {r['bfm_joint']:.1f}** |\n")
+    quant_blocks = [
+        wr.H2(text=f"Quantitative analysis — all {qa['n_clips']} grounded near-ground clips"),
+        wr.MarkdownBlock(text=(
+            f"Beyond the {len(rows)} featured clips above, we ran **every grounded** near-ground clip "
+            "in the seed set (crouch / squat / sit / crawl — references with feet on the floor, "
+            "floating retargets excluded) through **both** trackers under identical physics and scored "
+            "them with the same `rollout_metrics`. Aggregate (survival_rel = reference-relative survival; "
+            "joint° = RMS tracking error):")),
+        wr.MarkdownBlock(text=agg_tbl),
+        wr.MarkdownBlock(text=(
+            f"**BFM-Zero has lower joint error on {o['bfm_wins_joint']}/{o['n']} clips**, and holds the "
+            f"posture (survival_rel ≥ 0.9) on **{o['bfm_rel_ge_0.9']}/{o['n']}** clips vs HoloMotion's "
+            f"**{o['holo_rel_ge_0.9']}/{o['n']}**. The gap is largest on crouch/squat; the hardest cases "
+            "for *both* are exotic floor postures (cross-legged sit, crawl), where BFM-Zero stays "
+            "upright/seated but still can't match the exact pose. Per-clip detail:")),
+        wr.MarkdownBlock(text=per_clip),
+    ]
+
+
 blocks = [
     wr.H1(text="Tracker comparison: HoloMotion vs BFM-Zero on near-ground G1 motion"),
     wr.MarkdownBlock(text=(
@@ -90,6 +133,8 @@ blocks = [
         "\n*survival shown as **absolute / reference-relative** (see “About the metric” below). "
         "`joint°` = RMS joint tracking error vs reference. Both survival notions agree HoloMotion "
         "fails — so this is a real collapse, not a metric artifact.")),
+
+    *quant_blocks,
 
     wr.H2(text="Per-clip videos"),
     wr.MarkdownBlock(text=(
