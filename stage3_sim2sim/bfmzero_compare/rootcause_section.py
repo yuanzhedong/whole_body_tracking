@@ -57,10 +57,12 @@ def rootcause_blocks(here, wr, runset=None):
     ] if bz else []) + ([
         wr.MarkdownBlock(text=(
             "**See it** — `Reference | HoloMotion | BFM-Zero` with the live left-knee flexion on each "
-            "panel. As the squat deepens the reference knee bends to ~150°; BFM-Zero follows (~130°, "
-            "deep squat) while HoloMotion stalls (~80°, sprawls and collapses):")),
+            "panel. **Squat:** as it deepens the reference knee bends to ~150°; BFM-Zero follows (~130°) "
+            "while HoloMotion stalls (~80°) and sprawls. **Crouch:** the reference holds a deep crouch "
+            "(~165°); BFM-Zero holds it (~130°) while HoloMotion pops up (knee ~55°) and collapses:")),
         wr.PanelGrid(runsets=[runset()],
-                     panels=[wr.MediaBrowser(media_keys=["deep_flexion_squat"], num_columns=1)]),
+                     panels=[wr.MediaBrowser(media_keys=["deep_flexion_squat", "deep_flexion_crouch"],
+                                             num_columns=1)]),
     ] if (runset and os.path.exists(os.path.join(here, "deep_flexion_squat.mp4"))) else []) + [
         wr.MarkdownBlock(text=(
             "**Conclusion.** The near-ground failure is an **out-of-distribution policy capability gap**: "
