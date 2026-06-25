@@ -108,6 +108,8 @@ from stage3_sim2sim.bfmzero_compare.seed_section import seed_survival_blocks
 seed_blocks = seed_survival_blocks(HERE, wr)
 from stage3_sim2sim.bfmzero_compare.rootcause_section import rootcause_blocks
 rc_blocks = rootcause_blocks(HERE, wr)
+from stage3_sim2sim.bfmzero_compare.compute_section import compute_blocks
+comp_blocks = compute_blocks(wr)
 
 
 blocks = [
@@ -142,6 +144,7 @@ blocks = [
     *rc_blocks,
     *seed_blocks,
     *quant_blocks,
+    *comp_blocks,
 
     wr.H2(text="Per-clip videos"),
     wr.MarkdownBlock(text=(
