@@ -1,0 +1,145 @@
+{
+  "n_clips": 9,
+  "overall": {
+    "n": 9,
+    "orig_surv_rel_mean": 0.982,
+    "dec_surv_rel_mean": 0.928,
+    "orig_surv_mean": 0.753,
+    "dec_surv_mean": 0.719,
+    "orig_joint_mean": 16.144,
+    "dec_joint_mean": 17.456,
+    "dec_rel_ge_0.9": 7
+  },
+  "by_category": {
+    "crawl": {
+      "n": 1,
+      "orig_surv_rel": 0.84,
+      "dec_surv_rel": 0.715
+    },
+    "crouch": {
+      "n": 1,
+      "orig_surv_rel": 1.0,
+      "dec_surv_rel": 1.0
+    },
+    "sit": {
+      "n": 3,
+      "orig_surv_rel": 1.0,
+      "dec_surv_rel": 0.883
+    },
+    "squat": {
+      "n": 4,
+      "orig_surv_rel": 1.0,
+      "dec_surv_rel": 0.996
+    }
+  },
+  "rows": [
+    {
+      "idx": 0,
+      "clip": "crouch_ff_start_180_R_003__A145_M",
+      "cat": "crouch",
+      "label": "crouch (stand->deep crouch)",
+      "orig_surv_rel": 1.0,
+      "dec_surv_rel": 1.0,
+      "orig_joint": 19.2,
+      "dec_joint": 16.8,
+      "orig_surv": 0.642,
+      "dec_surv": 0.645
+    },
+    {
+      "idx": 1,
+      "clip": "squat_001__A360",
+      "cat": "squat",
+      "label": "squat",
+      "orig_surv_rel": 1.0,
+      "dec_surv_rel": 1.0,
+      "orig_joint": 11.3,
+      "dec_joint": 10.6,
+      "orig_surv": 0.938,
+      "dec_surv": 0.861
+    },
+    {
+      "idx": 2,
+      "clip": "squat_001__A362_M",
+      "cat": "squat",
+      "label": "squat",
+      "orig_surv_rel": 1.0,
+      "dec_surv_rel": 0.984,
+      "orig_joint": 10.0,
+      "dec_joint": 12.2,
+      "orig_surv": 0.919,
+      "dec_surv": 0.929
+    },
+    {
+      "idx": 3,
+      "clip": "squat_002__A359",
+      "cat": "squat",
+      "label": "squat",
+      "orig_surv_rel": 1.0,
+      "dec_surv_rel": 1.0,
+      "orig_joint": 15.2,
+      "dec_joint": 12.5,
+      "orig_surv": 0.911,
+      "dec_surv": 0.964
+    },
+    {
+      "idx": 4,
+      "clip": "squat_002__A362",
+      "cat": "squat",
+      "label": "squat",
+      "orig_surv_rel": 1.0,
+      "dec_surv_rel": 1.0,
+      "orig_joint": 12.7,
+      "dec_joint": 13.9,
+      "orig_surv": 0.981,
+      "dec_surv": 1.0
+    },
+    {
+      "idx": 5,
+      "clip": "sit_on_chair_stop_R_001__A047",
+      "cat": "sit",
+      "label": "sit down on chair",
+      "orig_surv_rel": 1.0,
+      "dec_surv_rel": 0.649,
+      "orig_joint": 9.7,
+      "dec_joint": 19.1,
+      "orig_surv": 1.0,
+      "dec_surv": 0.679
+    },
+    {
+      "idx": 6,
+      "clip": "sit_on_chair_start_R_001__A167",
+      "cat": "sit",
+      "label": "stand up from chair",
+      "orig_surv_rel": 1.0,
+      "dec_surv_rel": 1.0,
+      "orig_joint": 9.7,
+      "dec_joint": 14.2,
+      "orig_surv": 1.0,
+      "dec_surv": 1.0
+    },
+    {
+      "idx": 8,
+      "clip": "sit_cross_legged_loop_R_001__A414",
+      "cat": "sit",
+      "label": "cross-legged floor sit",
+      "orig_surv_rel": 1.0,
+      "dec_surv_rel": 1.0,
+      "orig_joint": 31.4,
+      "dec_joint": 33.4,
+      "orig_surv": 0.0,
+      "dec_surv": 0.0
+    },
+    {
+      "idx": 9,
+      "clip": "idle_crawl_stop_003__A128",
+      "cat": "crawl",
+      "label": "crawl",
+      "orig_surv_rel": 0.84,
+      "dec_surv_rel": 0.715,
+      "orig_joint": 26.1,
+      "dec_joint": 24.4,
+      "orig_surv": 0.387,
+      "dec_surv": 0.392
+    }
+  ]
+}
