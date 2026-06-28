@@ -49,6 +49,10 @@ This repo carries multiple Python venvs. Different stages use different ones:
 | `.venv/` | 2.5.1+cu124 | Isaac Sim 4.5 + Isaac Lab 2.1 — *optional* RL teacher training, `csv_to_npz`, Isaac evals | ❌ sm ≤ 90 only |
 | OMG / BFM-Zero env | (external) | Stage-4 tracker rollouts (lives with the external repo) | depends on its torch |
 
+To rebuild the Blackwell-capable env, see **[`requirements-venv6-core.txt`](requirements-venv6-core.txt)**
+(focused core deps + the cu128 install recipe) or **[`requirements-venv6.txt`](requirements-venv6.txt)**
+(the full captured freeze, incl. Isaac Sim 6.0). Both pin torch `2.10.0+cu128` (Python 3.12).
+
 **GPU note (verified):** the pipeline runs **end-to-end on RTX PRO 6000 Blackwell (sm_120)** using
 the torch-2.10/cu128 env (`.venv6`). The earlier "Blackwell unusable" caveat is a **torch-version**
 constraint, not a hardware one — it applies only to the Isaac Sim 4.5 venv (torch 2.5.1+cu124),

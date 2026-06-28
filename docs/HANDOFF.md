@@ -50,9 +50,12 @@ this repo; Stage 4 (the physics validator) shells out to external repos.
 
 ## Environment
 
-- Isaac Sim 4.5 + Isaac Lab 2.1, Python 3.10. Install per the base
-  [README](../README.md#installation): `python -m pip install -e source/whole_body_tracking`, plus
-  `UniMoTok/requirements.txt` for the VAE env.
+- **Pipeline env (Blackwell-capable):** Python 3.12 + torch `2.10.0+cu128`. Rebuild it from
+  [`requirements-venv6-core.txt`](requirements-venv6-core.txt) (core deps + cu128 install recipe) or
+  [`requirements-venv6.txt`](requirements-venv6.txt) (full freeze), plus `UniMoTok/requirements.txt`
+  for the VAE.
+- **Optional Isaac teacher-training env:** Isaac Sim 4.5 + Isaac Lab 2.1, Python 3.10
+  (`python -m pip install -e source/whole_body_tracking`) — RTX 4090 only.
 - The repo's local `.venv*/` dirs do **not** transfer — recreate them.
 - GPU: the pipeline runs **end-to-end on RTX PRO 6000 Blackwell (sm_120)** with a **torch ≥2.7 /
   cu128** env (here `.venv6`, torch 2.10) — verified. The only Blackwell limitation is the
