@@ -41,7 +41,7 @@ this repo; Stage 4 (the physics validator) shells out to external repos.
 
 | # | blocker | why | how to resolve |
 |---|---|---|---|
-| 1 | **UniMoTok submodule** | the pinned commit `73ef067` is **not pushed** to `Juzezhang/UniMoTok`; the submodule is SSH on branch `wbt-integration` (needs repo access) | get access to `Juzezhang/UniMoTok`; have the owner push commit `73ef067`, or check out the `wbt-integration` branch tip |
+| 1 | **UniMoTok submodule access** | the submodule is `git@github.com:Juzezhang/UniMoTok.git` on branch `wbt-integration` (the pin `92ca9af` is pushed and carries the G1 training configs) — but it's an SSH remote that requires read access | request read access to `Juzezhang/UniMoTok`, then `git submodule update --init --recursive` resolves cleanly. (If you only have HTTPS, set the submodule URL accordingly.) |
 | 2 | **OMG repo + HoloMotion ONNX** (Stage 4) | `stage3_sim2sim/run_l3_eval.py` hardcodes `/ws/user/yzdong/src/github/OMG` and the ONNX at `/scratch/user/yzdong/OMG-models/holomotion_dl/...` | obtain the OMG repo + ONNX; pass `--omg-root <path>` and edit the `ONNX` constant in `run_l3_eval.py` |
 | 3 | **BFM-Zero repo** (`humanoidverse`) | imported by `stage3_sim2sim/bfmzero_compare/batch_tracking_inference.py`; path `/ws/.../BFM-Zero` | install BFM-Zero / `humanoidverse` in the Stage-4 env |
 | 4 | **Seed CSVs** | `stage2/seed_to_artifacts.py --src` defaults to `/scratch/.../bones_seed/g1/csv` | obtain the BONES-SEED G1 CSVs (or any G1 CSVs in that schema) and pass `--src` |
