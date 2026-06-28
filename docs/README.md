@@ -5,6 +5,8 @@ tracking repo.
 
 ## Start here
 
+- **[HANDOFF.md](HANDOFF.md)** — shareable quickstart for someone cloning the repo fresh: what it
+  is, clone command, the external dependencies they must supply, and what runs out of the box.
 - **[PIPELINE_SETUP.md](PIPELINE_SETUP.md)** — end-to-end setup & run guide for the
   **seed data → UniMoTok VAE → BFM-Zero → sim2sim** pipeline: environment, exact commands for each
   stage, external prerequisites, verification gates, and the W&B result reports.
