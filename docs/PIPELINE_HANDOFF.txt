@@ -8,16 +8,16 @@ seed-data -> UniMoTok VAE -> BFM-Zero -> sim2sim pipeline. It validates that
 VAE-decoded G1 robot motion is physically executable in MuJoCo (survival +
 tracking error vs the original reference).
 
-Repo:    https://github.com/yuanzhedong/whole_body_tracking
-Branch:  seed-vae-sim2sim-pipeline   (the pipeline + docs live here, not main)
+Repo:    https://github.com/yuanzhedong/whole_body_tracking  (pipeline merged into main)
 
 Start here (full setup + handoff docs):
-  https://github.com/yuanzhedong/whole_body_tracking/blob/seed-vae-sim2sim-pipeline/docs/HANDOFF.md
-  https://github.com/yuanzhedong/whole_body_tracking/blob/seed-vae-sim2sim-pipeline/docs/PIPELINE_SETUP.md
+  https://github.com/yuanzhedong/whole_body_tracking/blob/main/docs/HANDOFF.md
+  https://github.com/yuanzhedong/whole_body_tracking/blob/main/docs/PIPELINE_SETUP.md
+  https://github.com/yuanzhedong/whole_body_tracking/blob/main/docs/VERIFICATION.md
 
 Clone
 -----
-  git clone -b seed-vae-sim2sim-pipeline git@github.com:yuanzhedong/whole_body_tracking.git
+  git clone git@github.com:yuanzhedong/whole_body_tracking.git
   cd whole_body_tracking
   git submodule update --init --recursive
 

@@ -8,12 +8,13 @@ sim2sim** pipeline for validating that VAE-decoded G1 robot motion is physically
 MuJoCo.
 
 - **Repo:** https://github.com/yuanzhedong/whole_body_tracking (public)
-- **Branch with the pipeline + docs:** `seed-vae-sim2sim-pipeline` *(not yet merged to `main`)*
+- **Branch:** merged into **`main`** (default) — clone normally; the dev branch was
+  `seed-vae-sim2sim-pipeline`.
 
 ## Clone
 
 ```bash
-git clone -b seed-vae-sim2sim-pipeline git@github.com:yuanzhedong/whole_body_tracking.git
+git clone git@github.com:yuanzhedong/whole_body_tracking.git
 cd whole_body_tracking
 git submodule update --init --recursive   # see Blocker 1 below
 ```
