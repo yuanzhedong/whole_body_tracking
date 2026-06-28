@@ -4,7 +4,7 @@
 set -u
 cd /ws/user/yzdong/src/github/whole_body_tracking
 NORM=stage2/out/g1_dataset_T4within/normalization.npz
-VAE="UniMoTok/experiments/biomechanics_tokenizer/EX_T4w_hardup/checkpoints/epoch=1020.ckpt"
+VAE="UniMoTok/experiments/biomechanics_tokenizer/EX_T4w_hardup/checkpoints/epoch=5999.ckpt"
 L=logs/rsl_rl/g1_flat
 trunc(){ .venv/bin/python -c "
 import numpy as np,sys

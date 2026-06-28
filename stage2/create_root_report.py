@@ -12,6 +12,13 @@ PROJECT = "beyondmimic-tracking"   # root report lives in the main project
 # ── Known reports (reportID from URL: /reports/title--<ID>) ──────────────────
 REPORTS = [
     {
+        "id":    "VmlldzoxNzI3NzE3NA==",
+        "title": "BONES-SEED → UniMoTok VAE → HoloMotion sim2sim (CURRENT EFFORT)",
+        "desc":  "Living tracking page for the active effort: train UniMoTok VAE on BONES-SEED (142k G1 clips, "
+                 "288h) and validate via the HoloMotion generalist tracker (MuJoCo, Blackwell) instead of "
+                 "per-clip teachers. Covers pipeline, datasets, what we've tried, and what's planned.",
+    },
+    {
         "id":    "VmlldzoxNzE5NTQ2Ng==",
         "title": "Gated pipeline: stage-1 survival gate + uniform VAE sim2sim (LATEST)",
         "desc":  "Clean pipeline (no per-clip weights): survival gate per motion (8/9 LAFAN pass "
@@ -43,6 +50,12 @@ REPORTS = [
 
 # ── Projects ─────────────────────────────────────────────────────────────────
 PROJECTS = [
+    {
+        "name":  "g1-teachers",
+        "desc":  "SAVED per-clip tracking-policy (teacher) artifacts — one `teacher_<clip>` per motion "
+                 "(model_*.pt + reloadable agent/env configs + gate_survival metadata). "
+                 "Source of truth for teacher coverage; reload for the later VAE/distillation stage.",
+    },
     {
         "name":  "beyondmimic-tracking",
         "desc":  "All G1 tracking policy training runs (walk, run, sprint, dance, jumps, …). "
@@ -113,13 +126,21 @@ blocks += [
         "Phase-2 sim2sim only for tiers passing Phase-0 gate.\n\n"
         f"[Live ablation results](https://wandb.ai/{ENTITY}/g1-vae-ablation)"
     )),
-    wr.H2(text="Tracking Policy Status (stage-1, survival gate ≥0.95)"),
+    wr.H2(text="Teacher Coverage (one RL tracking policy per motion clip)"),
     wr.MarkdownBlock(text=(
-        "All 9 LAFAN clips have a gate-passing teacher except jumps1 (0.914, retraining).\n\n"
-        "**Pass gate (original survival):** walk 1.00, sprint1 1.00, fightAndSports1 1.00, dance2 0.99, "
-        "run1 0.98, fight1 0.97, dance1 0.96, fallAndGetUp 0.95.\n\n"
-        "**Finding:** stage-1 converges far before 30k (walk ~6k/~2h, fallAndGetUp ~12k); 30k is "
-        "overkill. Use the survival gate as the stop criterion, not a fixed iteration budget."
+        "**134 teachers trained & SAVED to W&B** (`cs224n-robustqa/g1-teachers`, as of 2026-06-18) — "
+        "one `teacher_<clip>` artifact per motion (checkpoint + reloadable configs).\n\n"
+        "| source | motions | covered |\n"
+        "|---|---|---|\n"
+        "| **LAFAN1** (G1-retargeted) | 40 / 40 | ✅ complete (all saved) |\n"
+        "| **AMASS** (HF pre-retargeted) | 94 / 17,717 | churning ~25/day, continuous queue |\n"
+        "| **full LAFAN1 (77) via GMR** | +37 missing | in progress (BVH→G1 retarget) |\n\n"
+        "**LAFAN1 gate (original survival ≥0.95):** 23/40 PASS. Fails = all 5 fallAndGetUp (0.51–0.91, "
+        "the holdout) + fast run/sprint (0.92–0.94).\n\n"
+        "**Convergence (31-clip sample):** median iters-to-gate ≈ easy 1.8k / medium 3.4k / hard 6.0k — "
+        "far below the 30k convention. Per-clip ~0.7–2.4 h on a 4090; teachers trained at 12k iters.\n\n"
+        "**Pipeline scale:** per-clip teachers don't scale to all AMASS (~2 yr at current rate) — the "
+        "queue runs incrementally & is stoppable; full coverage is not the goal, broad saved coverage is."
     )),
     wr.H2(text="Key findings (2026-06)"),
     wr.MarkdownBlock(text=(

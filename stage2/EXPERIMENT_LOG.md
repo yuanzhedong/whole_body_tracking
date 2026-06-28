@@ -215,3 +215,45 @@ fallAndGetUp 0.74 = best-ever (was 0.16 baseline) but still <0.90 -> the one gen
 RECIPE: capacity must SCALE WITH data (lat512 for 12h; lat256 for ~8-40 clips). Big diverse corpus + matched
 capacity = best reconstruction + strong survival + rich latent (ideal for OmniMM diffusion handoff).
 RECOMMENDED HANDOFF VAE: EX_laA_lat512 (or raw8_lat256 if only the 8 specific clips matter). NEXT: lat1024.
+
+## FAITHFUL PIPELINE: gate teachers -> train VAE on gated set (2026-06-14)
+Trained per-clip tracking TEACHERS for ~31 LAFAN1 clips (12k iters each, queue on 4x4090). Gate-checked
+each (sim2sim survival of teacher on its ORIGINAL motion, >=0.95):
+  PASS 23/31. FAIL 8 = ALL 5 fallAndGetUp (0.51-0.91, the holdout) + run1_s5/sprint1_s4/run2_s4 (0.92-0.94).
+  (fight1_subject3 PASSED 0.984 despite low ep-len -> short motion fully tracked, not falls.)
+Built g1_dataset_gated23 (23 gated clips, 1.46h, 3217 windows) -> trained EX_gated23_lat512 (SAME arch as
+the winning laA_lat512: lat512/5L/ff1024/kl5e-5/1500ep). Only variable = gated 23-clip data vs ungated 12.1h.
+RECON RMSE on the SAME 23 clips:
+  EX_gated23_lat512 (1.46h gated)  = 0.192 mean   (walks ~0.13, dances/fights 0.2-0.34)
+  EX_laA_lat512    (12.1h ungated) = 0.146 mean   (walk1_s2 passes <0.10)
+*** KEY RESULT: GATING HURT THE VAE. *** Shrinking to 23 teacher-validated clips starved it of data; the big
+ungated corpus reconstructs the gated clips BETTER than the gated VAE does. => For the VAE, DATA QUANTITY/
+DIVERSITY dominates per-clip physical validity. Per-clip-teacher gating (a) can't scale to the 3072-clip
+corpus and (b) shrinking to the gateable LAFAN1 subset is counterproductive. Matches OMG (arxiv 2606.10340):
+keep 1000+h, FILTER egregious clips (cheap sim-in-the-loop), don't shrink. sim2sim survival confirmation: pending.
+
+### REFINEMENT (sim2sim done): it's DATA RELEVANCE, not "gating hurt"
+Decoded survival from this run = CONFOUNDED (the 12k teachers pass the gate on ORIGINAL motion 0.98-1.00
+but are too brittle for decoded motion -> all collapse 0.09-0.75). Methodology: sim2sim VAE eval needs
+ROBUST (full-30k) teachers, NOT just gate-passing 12k ones. Use RMSE as the clean signal here.
+Per-clip RMSE (gated23 vs laA on same clips):
+  walks:  laA 0.10 < gated23 0.14   (AMASS is locomotion-heavy -> laA covers walks well)
+  dance1: gated23 0.32 < laA 0.35
+  fight1: gated23 0.21 < laA 0.24
+  jumps1: gated23 0.19 < laA 0.25   (focused LAFAN data -> gated23 BETTER on all dynamic motions)
+CORRECTED CONCLUSION: gated23 mean (0.192) > laA mean (0.146) ONLY because the 23-clip set is 15/23 walks.
+On DYNAMIC motions the focused (LAFAN-only) VAE reconstructs BETTER -> AMASS dilution WEAKENS dynamic recon.
+=> The lever is DATA RELEVANCE to the target distribution, not raw size and not per-clip gating. Best path:
+big corpus for coverage BUT keep dynamic well-represented (don't let AMASS swamp it), and/or scale capacity
+(lat1024) to absorb both. NEXT: eval EX_laA_lat1024 (already trained) on dynamic clips; get full-30k teachers
+for an unconfounded sim2sim.
+
+### lat1024 eval: capacity past 512 does NOT help (lat512 is the sweet spot)
+EX_laA_lat1024 vs lat512 (same 12.1h corpus, same clips): lat1024 WORSE everywhere
+(walks 0.15 vs 0.10; dance1 0.36 vs 0.35; fight1 0.26 vs 0.24; jumps1 0.30 vs 0.25).
+=> non-monotonic capacity; 512 optimal at this data scale. More latent != better.
+*** THE REAL FRONTIER: DYNAMIC MOTIONS (dance/fight/jumps) recon at ~0.20-0.36 rad across EVERY config
+(lat256/512/1024, gated/ungated) and NEVER hit paper-grade <0.10; walks are ~0.10. Likely ARCHITECTURAL:
+1 global token / 128-frame window over-compresses high-frequency dynamic motion (fine for periodic walks).
+Levers to try: more tokens per window / shorter windows (less compression), or more dynamic training data.
+NOT more capacity (lat1024 worse) and NOT per-clip gating (loses coverage). Current best handoff = laA_lat512.
