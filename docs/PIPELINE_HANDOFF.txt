@@ -1,0 +1,78 @@
+G1 MOTION-TOKENIZER PIPELINE — HANDOFF
+=======================================
+
+What it is
+----------
+A public fork of the BeyondMimic motion-tracking codebase that adds a
+seed-data -> UniMoTok VAE -> BFM-Zero -> sim2sim pipeline. It validates that
+VAE-decoded G1 robot motion is physically executable in MuJoCo (survival +
+tracking error vs the original reference).
+
+Repo:    https://github.com/yuanzhedong/whole_body_tracking
+Branch:  seed-vae-sim2sim-pipeline   (the pipeline + docs live here, not main)
+
+Start here (full setup + handoff docs):
+  https://github.com/yuanzhedong/whole_body_tracking/blob/seed-vae-sim2sim-pipeline/docs/HANDOFF.md
+  https://github.com/yuanzhedong/whole_body_tracking/blob/seed-vae-sim2sim-pipeline/docs/PIPELINE_SETUP.md
+
+Clone
+-----
+  git clone -b seed-vae-sim2sim-pipeline git@github.com:yuanzhedong/whole_body_tracking.git
+  cd whole_body_tracking
+  git submodule update --init --recursive
+
+NOTE: the UniMoTok submodule is git@github.com:Juzezhang/UniMoTok.git (branch
+wbt-integration). You need READ ACCESS to that repo for the submodule step to
+work — ping me and I'll add you. The pin is pushed and includes the G1 training
+configs, so it resolves cleanly once you have access.
+
+The pipeline
+------------
+  BONES-SEED G1 CSV -> 41-D features -> UniMoTok MLD-VAE -> decode -> qpos_36
+  -> BFM-Zero / HoloMotion tracker -> MuJoCo
+
+  stage 1  stage2/seed_to_artifacts.py  +  stage2/export_g1_motion.py
+  stage 2  UniMoTok (submodule)  training.train_tokenizer
+  stage 3  stage3_sim2sim/decode_to_qpos36.py + to_bfmzero_motion.py
+  stage 4  stage3_sim2sim/run_l3_eval.py (HoloMotion) or bfmzero_compare/ (BFM-Zero)
+
+Stages 1-3 are self-contained in the repo. Stage 4 (physics validation) shells
+out to external repos (see below).
+
+Results (Weights & Biases reports)
+----------------------------------
+  Headline (BONES-SEED -> UniMoTok VAE -> BFM-Zero sim2sim):
+    https://wandb.ai/toddler_tracking/g1-sim2sim/reports/x--VmlldzoxNzMzOTg2Mg==
+  HoloMotion-validated pipeline (sibling):
+    https://wandb.ai/toddler_tracking/g1-sim2sim/reports/x--VmlldzoxNzMwNzgxMw==
+  Tracker comparison (HoloMotion vs BFM-Zero):
+    https://wandb.ai/toddler_tracking/g1-sim2sim/reports/x--VmlldzoxNzMzNDI0MA==
+
+What you'll need from me (not in the repo)
+------------------------------------------
+  1. Read access to Juzezhang/UniMoTok (for the submodule).
+  2. OMG repo + HoloMotion ONNX checkpoint  -> Stage 4 (HoloMotion tracker).
+     Pass --omg-root <path>; edit the ONNX path constant in run_l3_eval.py.
+  3. BFM-Zero repo (humanoidverse package)  -> Stage 4 (BFM-Zero tracker).
+  4. BONES-SEED G1 CSVs                      -> Stage 1 input (pass --src).
+  5. Trained VAE checkpoint (g1_seed_512_fixed_FINAL.ckpt), OR retrain in Stage 2
+     (the training configs ship in the UniMoTok submodule).
+  6. Robot-description assets: follow README "Installation" (curl from GCS).
+
+Environment
+-----------
+  Isaac Sim 4.5 + Isaac Lab 2.1, Python 3.10.
+  Install: python -m pip install -e source/whole_body_tracking
+           plus UniMoTok/requirements.txt for the VAE env.
+  GPU: validated on RTX 4090. Blackwell GPUs don't work with torch 2.5.1.
+  Env vars for any Isaac step:
+    OMNI_KIT_ACCEPT_EULA=YES CUDA_DEVICE_ORDER=PCI_BUS_ID
+    CUDA_VISIBLE_DEVICES=<4090> WANDB_ENTITY=<org>
+
+What runs without the external deps
+-----------------------------------
+  Stages 1-3 (seed -> features -> VAE train/decode -> BFM-Zero motion .pkl) run
+  with the repo + UniMoTok submodule + seed CSVs. Stage 4 additionally needs the
+  OMG/HoloMotion-ONNX and/or BFM-Zero repos.
+
+Questions -> ping me (Yuanzhe).
