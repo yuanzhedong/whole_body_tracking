@@ -54,7 +54,10 @@ this repo; Stage 4 (the physics validator) shells out to external repos.
   [README](../README.md#installation): `python -m pip install -e source/whole_body_tracking`, plus
   `UniMoTok/requirements.txt` for the VAE env.
 - The repo's local `.venv*/` dirs do **not** transfer — recreate them.
-- GPU: validated on RTX 4090s. Blackwell GPUs are unusable with torch 2.5.1 (no kernel image).
+- GPU: the pipeline runs **end-to-end on RTX PRO 6000 Blackwell (sm_120)** with a **torch ≥2.7 /
+  cu128** env (here `.venv6`, torch 2.10) — verified. The only Blackwell limitation is the
+  *optional* Isaac Sim 4.5 path (torch 2.5.1+cu124), whose kernels stop at sm_90 and so needs an
+  RTX 4090. It's a torch-version constraint, not a hardware one.
 - Required env vars for any Isaac step:
   `OMNI_KIT_ACCEPT_EULA=YES CUDA_DEVICE_ORDER=PCI_BUS_ID CUDA_VISIBLE_DEVICES=<4090> WANDB_ENTITY=<org>`.
 

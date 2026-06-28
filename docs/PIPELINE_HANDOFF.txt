@@ -64,10 +64,13 @@ Environment
   Isaac Sim 4.5 + Isaac Lab 2.1, Python 3.10.
   Install: python -m pip install -e source/whole_body_tracking
            plus UniMoTok/requirements.txt for the VAE env.
-  GPU: validated on RTX 4090. Blackwell GPUs don't work with torch 2.5.1.
-  Env vars for any Isaac step:
+  GPU: the pipeline runs END-TO-END on RTX PRO 6000 Blackwell (sm_120) with a
+       torch >=2.7 / cu128 env (here .venv6, torch 2.10) -- verified. The only
+       Blackwell limitation is the OPTIONAL Isaac Sim 4.5 path (torch 2.5.1),
+       whose kernels stop at sm_90 and need an RTX 4090. (Version, not hardware.)
+  Env vars for the optional Isaac step:
     OMNI_KIT_ACCEPT_EULA=YES CUDA_DEVICE_ORDER=PCI_BUS_ID
-    CUDA_VISIBLE_DEVICES=<4090> WANDB_ENTITY=<org>
+    CUDA_VISIBLE_DEVICES=<gpu> WANDB_ENTITY=<org>
 
 What runs without the external deps
 -----------------------------------

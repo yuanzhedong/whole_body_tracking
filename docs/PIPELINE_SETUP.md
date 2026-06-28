@@ -41,21 +41,26 @@ your local clones. Everything upstream of qpos_36 needs none of these.
 
 ## 1. Environment
 
-This repo carries three Python venvs (see [memory: WBT local setup]). Different stages use
-different ones:
+This repo carries multiple Python venvs. Different stages use different ones:
 
-| venv | python | used for |
-|---|---|---|
-| `.venv/` | 3.10 | Isaac Sim 4.5 + Isaac Lab 2.1 — teacher training, `csv_to_npz`, Isaac evals |
-| UniMoTok env | 3.10 | VAE training/decode (torch 2.5.1 + cu124; see `UniMoTok/requirements.txt`) |
-| OMG / BFM-Zero env | — | Stage-4 tracker rollouts (lives with the external repo) |
+| venv | torch | used for | Blackwell (sm_120)? |
+|---|---|---|---|
+| `.venv6/` | **2.10.0+cu128** | the seed→VAE→BFM-Zero→**sim2sim** pipeline (Stages 1–4; Isaac-free: numpy/scipy + torch + MuJoCo) | ✅ works |
+| `.venv/` | 2.5.1+cu124 | Isaac Sim 4.5 + Isaac Lab 2.1 — *optional* RL teacher training, `csv_to_npz`, Isaac evals | ❌ sm ≤ 90 only |
+| OMG / BFM-Zero env | (external) | Stage-4 tracker rollouts (lives with the external repo) | depends on its torch |
+
+**GPU note (verified):** the pipeline runs **end-to-end on RTX PRO 6000 Blackwell (sm_120)** using
+the torch-2.10/cu128 env (`.venv6`). The earlier "Blackwell unusable" caveat is a **torch-version**
+constraint, not a hardware one — it applies only to the Isaac Sim 4.5 venv (torch 2.5.1+cu124),
+whose CUDA kernels stop at sm_90, so that *optional* teacher-training path needs an RTX 4090
+(sm 8.9) instead.
 
 Required env vars for any Isaac step:
 
 ```bash
 export OMNI_KIT_ACCEPT_EULA=YES
 export CUDA_DEVICE_ORDER=PCI_BUS_ID
-export CUDA_VISIBLE_DEVICES=1   # use a 4090 (GPUs 1,2,4,5); GPUs 0,3 are Blackwell — no torch kernels
+export CUDA_VISIBLE_DEVICES=1   # for the Isaac/torch-2.5.1 path use a 4090 (sm 8.9); torch 2.10 (.venv6) runs on Blackwell too
 export WANDB_ENTITY=<your-org>  # NOT your personal username
 ```
 
