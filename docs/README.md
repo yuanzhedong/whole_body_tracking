@@ -7,6 +7,8 @@ tracking repo.
 
 - **[HANDOFF.md](HANDOFF.md)** — shareable quickstart for someone cloning the repo fresh: what it
   is, clone command, the external dependencies they must supply, and what runs out of the box.
+- **[VERIFICATION.md](VERIFICATION.md)** — end-to-end run results on RTX PRO 6000 Blackwell
+  (Gate D: decoded survival 1.00 = original), with reproduce commands.
 - **[PIPELINE_SETUP.md](PIPELINE_SETUP.md)** — end-to-end setup & run guide for the
   **seed data → UniMoTok VAE → BFM-Zero → sim2sim** pipeline: environment, exact commands for each
   stage, external prerequisites, verification gates, and the W&B result reports.
