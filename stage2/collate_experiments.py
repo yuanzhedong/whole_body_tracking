@@ -71,13 +71,17 @@ def fmt_g2():
 
 
 def fmt_dagger():
-    d = load_json(OUT / "dagger_H16_seed40" / "dagger_curve.json")
-    if not d:
-        return "_(no DAgger results yet)_\n"
-    out = ["| iter | student survival | buffer clips |", "|---|---|---|"]
-    for c in d["curve"]:
-        out.append(f"| {c['iter']} | {c['student_survival']} | {c['buffer_clips']} |")
-    return "\n".join(out) + "\n"
+    dirs = sorted(glob.glob(str(OUT / "dagger_*")))
+    blocks = []
+    for dd in dirs:
+        d = load_json(Path(dd) / "dagger_curve.json")
+        if not d:
+            continue
+        name = Path(dd).name
+        curve = d["curve"]
+        line = " → ".join(f"{c['student_survival']}" for c in curve)
+        blocks.append(f"**{name}** ({len(curve)} iters): survival {line}")
+    return ("\n\n".join(blocks) + "\n") if blocks else "_(no DAgger results yet)_\n"
 
 
 def fmt_collections():
