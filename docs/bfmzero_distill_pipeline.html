@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BFM-Zero → Control-VAE distillation — pipeline & live status</title>
+<style>
+  :root{--fg:#1a1a1a;--mut:#666;--bg:#fff;--card:#f6f7f9;--acc:#2b6cb0;--good:#1a7f37;--bad:#b42318;--warn:#b25e00;--bd:#e2e5e9}
+  *{box-sizing:border-box}
+  body{font:15px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--fg);background:var(--bg);margin:0;padding:0 20px 80px}
+  main{max-width:920px;margin:0 auto}
+  h1{font-size:26px;margin:32px 0 4px;line-height:1.25}
+  h2{font-size:20px;margin:36px 0 8px;padding-top:10px;border-top:1px solid var(--bd)}
+  h3{font-size:16px;margin:20px 0 6px}
+  .sub{color:var(--mut);margin:0 0 8px}
+  code,pre{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
+  code{background:var(--card);padding:1px 5px;border-radius:4px;font-size:13px}
+  pre{background:var(--card);border:1px solid var(--bd);border-radius:8px;padding:14px;overflow:auto;font-size:13px;line-height:1.45}
+  table{border-collapse:collapse;width:100%;margin:10px 0;font-size:14px}
+  th,td{border:1px solid var(--bd);padding:6px 10px;text-align:left;vertical-align:top}
+  th{background:var(--card)}
+  .tag{display:inline-block;padding:2px 9px;border-radius:999px;font-size:12px;font-weight:600}
+  .t-run{background:#e7f0ff;color:#1a4b8c}.t-done{background:#e3f6e9;color:var(--good)}.t-next{background:#f2f2f2;color:#555}
+  .callout{border-left:4px solid var(--warn);background:#fff8ef;padding:12px 16px;border-radius:0 8px 8px 0;margin:14px 0}
+  .callout.bad{border-color:var(--bad);background:#fff4f2}
+  .callout.good{border-color:var(--good);background:#f2fbf5}
+  .mut{color:var(--mut)}
+  .mono-sm{font-size:12.5px}
+  .good{color:var(--good);font-weight:600}.bad{color:var(--bad);font-weight:600}
+  .banner{background:#0f1b2d;color:#dfe8f5;border-radius:10px;padding:14px 18px;margin:18px 0}
+  .banner b{color:#fff}
+  footer{margin-top:40px;color:var(--mut);font-size:13px;border-top:1px solid var(--bd);padding-top:14px}
+</style>
+</head>
+<body>
+<main>
+
+<h1>BFM-Zero → Control-VAE distillation</h1>
+<p class="sub">Reference motion → humanoid action. Design + live experiment status. Offline mirror of the W&amp;B report.</p>
+
+<div class="banner">
+<b>What this is.</b> Building the faithful BeyondMimic <b>Fig-7 control VAE</b>, but distilling
+<b>BFM-Zero</b> (the Forward-Backward foundation-model tracker) as the single generalist teacher.
+The VAE maps <b>reference → action</b>, with an <code>N(0,I)</code> latent, trained on
+<b>(state, reference, action)</b> triples under <b>domain randomization</b>, validated <b>sim2sim</b> in MuJoCo.
+Goal: fuse the two-stage <i>generate-then-track</i> pipeline into one latent→action controller with a
+diffusion-ready latent.
+</div>
+
+<h2>Pipeline</h2>
+<pre>
+ reference motion ──▶ Encoder E ──▶ z ~ N(μ,σ) ──▶ Decoder D ──▶ action ──▶ MuJoCo
+ (H-frame window)    (learned)     (32-D, smooth)  + proprio s   (29-D PD    (survival /
+                                                                  targets)    tracking)
+                          ▲                              ▲
+      teacher target:  z_bfm = BFM.backward_map(r)   a* = BFM.act(s, z_bfm)
+      loss:  ‖â − a*‖²  +  β·KL(q(z)‖N(0,I))  [+ α·‖adapt(z) − z_bfm‖²]
+</pre>
+
+<h2>Why distill BFM-Zero (vs the validated generate-then-track pipeline)</h2>
+<ol>
+<li><b>One deployable controller</b> — <code>a = D(z, proprio)</code> replaces decode-then-track.</li>
+<li><b>A diffusion-ready latent</b> — BFM-Zero's <code>z</code> lives on a √d-sphere (<code>project_z</code>), not a
+Gaussian; the KL term gives an <code>N(0,I)</code> action-latent, which downstream latent-diffusion needs
+(raw actions have torque spikes that break diffusion — the VAE smooths them).</li>
+<li><b>Inherit BFM-Zero's coverage</b> — including near-ground crouch/sit/squat that HoloMotion collapses on — in a compact student.</li>
+</ol>
+
+<h2>Key insight — BFM-Zero already factorizes as a control VAE</h2>
+<p>Verified in <code>humanoidverse/agents/fb/model.py</code>:</p>
+<pre>z = model.backward_map(ref_obs)     # reference/goal motion -> latent z   (E)
+a = model.act(proprio_obs, z)       # z + current state     -> action     (D)</pre>
+<p>So we distill the pair <code>(backward_map, act)</code> into a VAE with a Gaussian bottleneck.
+Interface (dims verified from a live rollout of the pretrained model):</p>
+<table>
+<tr><th>symbol</th><th>source</th><th>dim / semantics</th></tr>
+<tr><td><code>r</code> reference (encoder in)</td><td><code>get_backward_observation</code></td><td><b>556 / frame</b> — ref body pos/rot/vel/ang-vel, local-root</td></tr>
+<tr><td><code>s</code> proprio (decoder in)</td><td><code>_get_g1env_observation</code></td><td><b>929</b> — joint pos/vel, base, history, last action</td></tr>
+<tr><td><code>a*</code> target action</td><td><code>model.act(s, z)</code></td><td><b>29-D scaled joint-position targets</b> (offset from default pose, <code>action_scale=0.25</code> → PD <code>kp=50</code>); <b>not torque</b></td></tr>
+<tr><td><code>z</code> teacher latent</td><td><code>project_z(backward_map(r))</code></td><td><b>256</b>, on a √d-sphere — <b>not</b> <code>N(0,I)</code></td></tr>
+</table>
+<p class="mut">Action = position targets (not torque) ⇒ behaviour-cloning is well-behaved (no spikes).</p>
+
+<h2>Model, loss, and the encoder horizon H</h2>
+<p><code>MotionVAE</code> (<code>stage2/vae_model.py</code>): <code>E(ref_window[H]) → (μ,logσ)</code>,
+<code>z~N(μ,σ)</code>; <code>D(z, proprio) → â</code>. State-conditioning is non-negotiable (under DR/noise the
+same reference needs different corrections in different states).</p>
+<table>
+<tr><th>H</th><th>regime</th><th>note</th></tr>
+<tr><td>1</td><td>per-step causal (Fig-7 exact)</td><td>most reactive</td></tr>
+<tr><td>~8–16</td><td><b>short horizon (recommended)</b></td><td>16 aligns with the Fig-7 diffusion horizon</td></tr>
+<tr><td>≥64</td><td>long / whole-clip</td><td>good for generation, <b>too long for control</b></td></tr>
+</table>
+<p class="mut">H is a <b>training-time</b> knob: the collector logs the per-step reference, so any H window
+is a cheap train-time slice (sweep without re-collecting). Distinct from the motion-reconstruction VAE's
+128-frame window (that length is right for generation).</p>
+
+<h2>The hard problem — covariate shift &amp; the two roles of domain randomization</h2>
+<p>The student <b>is</b> the tracker now, so its own errors feed back; naive offline BC drifts to states
+BFM-Zero never visited → falls. Escalating fixes: (1) <b>DART / noise-injection BC</b> — step the env with a
+<i>noised</i> action to fatten the visited-state tube, but label each state with the <i>clean</i> teacher
+action <code>a*</code>; (2) <b>DAgger</b> — roll out the student, relabel with BFM-Zero; (3) on-policy + OU noise + DR.</p>
+<p><b>DR has two roles:</b> (a) <i>robustness</i> for sim2sim/sim2real (mass/friction/motor/latency + obs noise);
+(b) <i>covariate coverage</i> — DR widens the collected-state distribution. Subtlety: BFM-Zero was trained with
+DR, so match its ranges first, then widen.</p>
+
+<h2>Live experiment status</h2>
+<p>Phase-1 collection (BFM-Zero env, MuJoCo, Blackwell GPUs) — <b>all seed data</b> (BONES-SEED clips):</p>
+<table>
+<tr><th>dataset</th><th>clips</th><th>DART</th><th>purpose</th><th>status</th></tr>
+<tr><td><code>bfmpairs_seed40_dart01</code></td><td>40</td><td>0.1</td><td>fast → first sweep</td><td><span class="tag t-done">done</span></td></tr>
+<tr><td><code>bfmpairs_large_dart01</code></td><td>569</td><td>0.1</td><td>full seed set</td><td><span class="tag t-run">collecting</span></td></tr>
+<tr><td><code>bfmpairs_seed569_nodart</code></td><td>569</td><td>0.0</td><td>DART on/off ablation</td><td><span class="tag t-run">collecting</span></td></tr>
+<tr><td><code>bfmpairs_s2k_dart01</code></td><td>1962</td><td>0.1</td><td>scale-up</td><td><span class="tag t-run">collecting</span></td></tr>
+</table>
+<p>Phase-2 HP sweep on <code>seed40</code> — grid
+<code>H∈{1,8,16,32} × latent∈{16,32,64} × β∈{1e-3,1e-2,1e-1} × align∈{0,0.5}</code> (72 runs) across the
+RTX PRO 6000 Blackwell / 4090 GPUs. <span class="tag t-run">running</span></p>
+
+<div class="callout bad">
+<b>⚠ Key finding (decision-guiding): the latent collapses.</b>
+Across <b>60+ configs</b>, the max <b>z-ablation is 0.016</b> — far below the G3 gate of 0.1 — while
+reconstruction is uniformly good (val RMSE ≈ 0.10–0.11 in action units). <b>No hyperparameter rescues it.</b>
+Interpretation: the <b>929-D proprio observation already determines BFM-Zero's action</b>, so the decoder
+reconstructs from proprio alone and <b>ignores the latent</b> (posterior collapse from over-informative
+conditioning). The current formulation degenerates to a proprio→action clone (a conditional policy), <b>not</b>
+a useful generative latent.
+</div>
+
+<h3>Sweep leaderboard (top runs, ranked by z-ablation)</h3>
+<table class="mono-sm">
+<tr><th>z-ablation</th><th>active dims</th><th>val RMSE</th><th>H</th><th>latent</th><th>β</th><th>align</th></tr>
+<tr><td>0.016</td><td>64</td><td>0.1113</td><td>1</td><td>64</td><td>1e-3</td><td>0.5</td></tr>
+<tr><td>0.016</td><td>64</td><td>0.1061</td><td>8</td><td>64</td><td>1e-3</td><td>0.5</td></tr>
+<tr><td>0.016</td><td>64</td><td>0.1079</td><td>16</td><td>64</td><td>1e-3</td><td>0.5</td></tr>
+<tr><td>0.015</td><td>32</td><td>0.1061</td><td>1</td><td>32</td><td>1e-3</td><td>0.5</td></tr>
+<tr><td>0.012</td><td>16</td><td>0.1064</td><td>16</td><td>16</td><td>1e-3</td><td>0.5</td></tr>
+</table>
+<p class="mut">Weak trends: bigger latent + <code>align=0.5</code> + low <code>β</code> give marginally higher
+z-ablation (0.016 vs 0.011) — but all negligible. The signal is unambiguous: proprio dominates.</p>
+
+<div class="callout good">
+<b>➡ Recommended next step (phase 2b).</b> Force the reference to flow <b>only</b> through the encoder→z:
+<b>strip the goal/reference-tracking terms from the decoder's proprio input</b> so the decoder sees true
+proprioception (joint pos/vel, base, gravity) but not the reference. If z-ablation then rises above 0.1, the
+latent is carrying motion intent and the VAE is generative-ready. If reconstruction collapses instead, it
+confirms the action is fundamentally state-reactive and we accept a conditional-policy latent (fine for
+control, weak for diffusion) — either way it decides the Phase-3 direction. Cheap to test: it's an input-mask
+ablation on the existing pairs, no re-collection.
+</div>
+
+<h2>Verification gates (teacher = BFM-Zero)</h2>
+<table>
+<tr><th>gate</th><th>proves</th><th>pass</th><th>now</th></tr>
+<tr><td><b>G1</b> reconstruction</td><td>decoder learned BFM-Zero's map</td><td>‖â−a*‖² small</td><td class="good">✓ (RMSE ≈ 0.10)</td></tr>
+<tr><td><b>G3</b> latent structure</td><td>latent smooth, used, ≈N(0,I)</td><td>z-ablation ≥ 0.1, ≥2 active</td><td class="bad">✗ (0.016) — see finding</td></tr>
+<tr><td><b>G2</b> closed-loop <i>(hard)</i></td><td>the VAE policy controls the robot</td><td>survival ≥ 0.9× BFM-Zero</td><td class="mut">phase 3</td></tr>
+<tr><td><b>G4</b> robustness</td><td>recovery basin under DR/OU noise</td><td>recovers</td><td class="mut">phase 3</td></tr>
+</table>
+<p>Do not proceed to diffusion until <b>G2 + G3</b> pass. G3 is currently red — the finding above is the blocker to resolve first.</p>
+
+<h2>Phased plan</h2>
+<table>
+<tr><th>phase</th><th>deliverable</th><th>status</th></tr>
+<tr><td>0</td><td>confirm BFM-Zero I/O (action = 29-D pos-targets; z on √d-sphere)</td><td><span class="tag t-done">done</span></td></tr>
+<tr><td>1</td><td><code>collect_bfmzero_pairs.py</code> — per-step (s,r,a*,z) with DR + DART</td><td><span class="tag t-done">built</span> · <span class="tag t-run">collecting</span></td></tr>
+<tr><td>2</td><td><code>train_control_vae.py</code> + <code>sweep_control_vae.py</code> — sweep H; G1/G3 metrics</td><td><span class="tag t-done">built</span> · <span class="tag t-run">sweeping</span></td></tr>
+<tr><td>2b</td><td>decoder-input ablation (strip reference from proprio) — the finding above</td><td><span class="tag t-next">next</span></td></tr>
+<tr><td>3</td><td>closed-loop: run the VAE as a policy in MuJoCo; survival vs BFM-Zero (G2)</td><td><span class="tag t-next">next</span></td></tr>
+<tr><td>4</td><td>DAgger (if G2 red) — student rollout + BFM-Zero relabel</td><td><span class="tag t-next">conditional</span></td></tr>
+<tr><td>5</td><td>sim2sim across DR seeds; survival/tracking vs BFM-Zero on near-ground suite</td><td><span class="tag t-next">next</span></td></tr>
+</table>
+
+<footer>
+Code: <code>stage2/BFMZERO_DISTILL_PLAN.md</code>, <code>collect_bfmzero_pairs.py</code>,
+<code>train_control_vae.py</code>, <code>sweep_control_vae.py</code>, <code>vae_model.py</code> — in the
+whole_body_tracking repo. Sweep artifacts: <code>stage2/out/sweep_seed40/leaderboard.csv</code>.
+This HTML is a static offline mirror; regenerate as results land. Generated 2026-07-01.
+</footer>
+
+</main>
+</body>
+</html>
