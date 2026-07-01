@@ -21,6 +21,11 @@ stage3_sim2sim/bfmzero_compare/batch_tracking_inference.py which this mirrors.
 
 Output: <out_dir>/pairs_<mid>.npz with proprio[T,ds], ref[T,dr], action[T,29],
 z[T,dz], plus scalar meta. Concatenate across motions for phase-2 training.
+
+Note on the encoder horizon H (PLAN sec. 3): `ref` is logged PER STEP (the full
+[T,dr] reference sequence per motion), so the phase-2 trainer can slice any H-frame
+window on the fly and sweep H WITHOUT re-collecting. Do not bake H in here --
+pre-windowing would fix one H and inflate storage ~Hx. H is a training-time knob.
 """
 import os
 

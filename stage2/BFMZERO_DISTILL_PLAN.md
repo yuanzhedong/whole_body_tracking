@@ -59,9 +59,26 @@ reconstruction target.
 - **Loss** `‖â − a*‖² + β·KL(q(z)‖N(0,I))` (+ optional latent-align `‖z − project(backward_map(r))‖²`
   so the Gaussian latent stays semantically tied to BFM-Zero's `z`).
 
-**Encoder granularity (decision):** short-horizon reference **window → z, held over the horizon,
-decode per-step with proprio**. This is diffusion-friendly (one `z` per segment) *and* closed-loop
-stable. Alternatives: per-step causal (Fig-7 exact) or whole-clip global token (UniMoTok MLD-VAE).
+**Encoder horizon `H` (first-class hyperparameter).** The encoder sees an `H`-frame reference window
+→ `z`, `z` is held over the horizon, and the decoder emits an action per step with proprio. `H` is a
+**sweepable knob**, not a fixed choice:
+
+| `H` | regime | notes |
+|---|---|---|
+| `1` | per-step causal (Fig-7 exact) | most reactive; latent = instantaneous intent |
+| `~8–16` | short horizon (**recommended default**) | near-term intent; `16` lines up with the Fig-7 diffusion horizon; diffusion-friendly, closed-loop stable |
+| `≥64` | long / whole-clip (UniMoTok MLD-VAE regime) | good for *generation*, **too long for control** — latent gets diffuse, the Gaussian bottleneck strains, action over-smooths |
+
+**Do not confuse this with the motion-reconstruction VAE's 128-frame window** (`config_g1_seed_512_fixed.yaml`,
+`window_size: 128` ≈ 6.4 s @ 20 fps). That length is *appropriate for generation* (compress a whole
+clip → one global token). For **control**, a single action depends on the current state + near-term
+reference, so `H` should be **short** (per-step to ~16). Short for control, long for generation.
+
+**Where `H` lives:** it is a **training-time** parameter (phase 2), **not** a collection parameter.
+`collect_bfmzero_pairs.py` logs the **full per-step reference sequence per motion**, so any `H` window
+(past or future frames) is a cheap train-time slice — sweep `H` without re-collecting. Pre-windowing
+in the collector would bake in one `H` and inflate storage ~`H×`; per-step logging is strictly more
+flexible.
 
 ## 4. The hard problem: covariate shift, and where DR / DART fit
 
@@ -91,7 +108,7 @@ states BFM-Zero never visited → compounding error → fall. Three escalating f
 |---|---|---|---|
 | **0** confirm BFM-Zero I/O | action = 29-D pos-targets; `act`/`backward_map`/`project_z` signatures; z-dim | `humanoidverse/agents/fb/model.py` | ✅ done (§2) |
 | **1** data collector | `stage2/collect_bfmzero_pairs.py`: per-step `(s, r, a*, z)` with DR + DART noise → npz | `batch_tracking_inference.py` | **this PR (prototype)** |
-| **2** offline VAE-BC | train `MotionVAE` on triples; recon MSE, active dims, z-ablation | `vae_model.py`, `verify_vae.py` G1/G3 | next |
+| **2** offline VAE-BC | train `MotionVAE` on triples (**sweep encoder horizon `H`**, §3); recon MSE, active dims, z-ablation | `vae_model.py`, `verify_vae.py` G1/G3 | next |
 | **3** closed-loop gate | run distilled VAE **policy** in MuJoCo; survival vs BFM-Zero (**hard gate G2**) | `verify_vae.py` G2, `stage3_sim2sim/` | next |
 | **4** DAgger (if G2 red) | student-rollout + BFM-Zero relabel in humanoidverse | `distill_vae.py` (teacher→BFM-Zero) | conditional |
 | **5** sim2sim | HV/Isaac-trained VAE → MuJoCo across DR seeds; survival/tracking vs BFM-Zero on near-ground suite | `run_l3_eval.py` pattern | next |
