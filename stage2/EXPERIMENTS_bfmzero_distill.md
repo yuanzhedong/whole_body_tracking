@@ -97,3 +97,44 @@ the latent's closed-loop importance; **G2 is the metric that counts**, not G1/G3
 **Meta-lesson for the pipeline:** G1/G3 (offline recon / z-ablation) are necessary but **misleading
 in isolation** — a model can look collapsed offline yet use its latent dynamically, and look good
 offline yet fall closed-loop. **Gate on G2 (closed-loop survival) for every design decision.**
+
+---
+
+## Autonomous session — waves 2+ (2026-07-01)
+
+### Dual vs single-head (32-run sweep, seed40) — latent fix CONFIRMED
+| head | best latent-usage | action RMSE |
+|---|---|---|
+| single (m=0) | **0.0003** (dead, 0/32 active) | ~0.11 |
+| dual (m>0) | **~1.1** (motion-z-ablation, full use) | ~0.11 |
+
+Forcing z to reconstruct motion fixes the collapse at **zero action-recon cost**. Answers the
+architecture question: it's not *where* z comes from (single-head already uses its own encoder, not
+backward_map, and still collapses) — it's *what supervises z*. Motion reconstruction is the fix.
+
+### Generative-latent test (offline) — dual-head is diffusion-ready
+Dual (H1_m1): 20/32 active dims, agg-posterior mean **0.03** (~0 ideal), interpolation smoothness
+1.21, **94%** of prior-decoded features within 2× of real spread. Single-head: 0/32 active. → the
+dual-head latent is samplable/interpolable (diffusion-ready); single-head is not.
+
+### G2 closed-loop (40 clips, seed) — covariate shift is real
+| ckpt | BFM | VAE(μ) | VAE(0) |
+|---|---|---|---|
+| **H1** | 0.80 | **0.40** | 0.275 |
+| H16 | 0.80 | 0.25 | 0.225 |
+| H32 | 0.775 | 0.25 | 0.275 |
+
+BC gap real (best 0.40 vs BFM 0.78). **Shorter horizon H1 survives best** closed-loop (reactive
+control wins for BC); latent helps most at H1 (μ 0.40 > 0 0.275).
+
+### DAgger — two bugs found & fixed (autonomous debugging)
+1. **Empty buffer** → student forgot BC behavior → 0.2→0→0. Fix: `--bc-data-dir` seeds D_BC.
+2. **Fallen-state flooding** → after a fall, hundreds of fallen (s,a*) pairs dominated the buffer →
+   0.45→0.025. Fix: truncate the aggregation rollout at `root_z<FALL_Z`.
+Re-running single + dual head DAgger (H1, BC-seeded, fall-truncated).
+
+### Data pipeline (DATA_PIPELINE.md) — robot renderer built
+Self-contained MuJoCo G1 renderer (`stage2/render_g1_clip.py`): rollout npz →
+`[Reference | BFM-Zero executed]` mp4 (960×480, real-time 30fps). Verified visually. Sample videos:
+`docs/sample_Neutral_kick_trash_001__A057.mp4`, `docs/sample_jog_squat_A492.mp4`. Human SMPL panel
+needs external SOMA-X (Track B).
