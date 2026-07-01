@@ -9,7 +9,8 @@ import wandb
 from wandb_gql import gql
 
 ENTITY, PROJECT = "toddler_tracking", "g1-sim2sim"
-MATCH = "Data Generation Pipeline"
+# match on the report DESCRIPTION — the list API returns title=None, but description is populated
+MATCH = "paired G1 robot"
 
 
 def main():
@@ -21,11 +22,8 @@ def main():
 
     matches = []
     for r in api.reports(f"{ENTITY}/{PROJECT}"):
-        try:
-            title = wandb.apis.reports.Report.from_url(r.url).title
-        except Exception:
-            title = getattr(r, "title", "") or ""
-        if MATCH in title:
+        desc = getattr(r, "description", "") or ""
+        if MATCH in desc:
             matches.append(r.id)
     if not matches:
         print("no matching reports found"); return
