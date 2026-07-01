@@ -3,6 +3,7 @@
 Summarizes docs/DATA_PIPELINE.md (two paired tracks: robot state-action + human SMPL/SMPL-X)
 with the rendered sample videos embedded. Run in an env with the reports API (.venv, wandb 0.27).
 """
+import glob
 import os
 import wandb
 import wandb.apis.reports as wr
@@ -17,15 +18,20 @@ md = wr.MarkdownBlock
 # ── media run: the rendered robot sample videos ─────────────────────────────
 run = wandb.init(entity=ENTITY, project=PROJECT, name=RUN_NAME, id=RUN_NAME,
                  resume="allow", job_type="analysis", reinit=True)
-media = {}
-for key, fn in [("sample_kick", "sample_Neutral_kick_trash_001__A057.mp4"),
-                ("sample_jog", "sample_jog_squat_A492.mp4")]:
+media, demo_keys = {}, []
+# the two hero clips first, then the full diverse gallery from docs/demo/
+for fn in ["sample_Neutral_kick_trash_001__A057.mp4", "sample_jog_squat_A492.mp4"]:
     p = os.path.join(DOCS, fn)
     if os.path.exists(p):
-        media[key] = wandb.Video(p, fps=30, format="mp4")
+        key = "demo_" + os.path.splitext(fn)[0].replace("sample_", "")
+        media[key] = wandb.Video(p, fps=30, format="mp4"); demo_keys.append(key)
+for p in sorted(glob.glob(os.path.join(DOCS, "demo", "*.mp4"))):
+    key = "demo_" + os.path.splitext(os.path.basename(p))[0]
+    media[key] = wandb.Video(p, fps=30, format="mp4"); demo_keys.append(key)
 if media:
     run.log(media)
 run.finish()
+print(f"logged {len(demo_keys)} demo videos")
 
 
 def runset():
@@ -78,7 +84,10 @@ blocks = [
         "in physics — the `(state, action)` source for Track A. (The full triptych adds the SMPL-X "
         "human panel via Track B.)")),
     wr.PanelGrid(runsets=[runset()],
-                 panels=[wr.MediaBrowser(media_keys=["sample_kick", "sample_jog"], num_columns=1)]),
+                 panels=[wr.MediaBrowser(media_keys=demo_keys, num_columns=2)]),
+    md(text=(
+        f"_Gallery: {len(demo_keys)} BONES-SEED clips spanning locomotion, crouch/squat/sit, jump, "
+        "turn, dance, kick, punch, bow — each `[ reference retarget | BFM-Zero executed ]`._")),
 
     wr.H2(text="Output schema"),
     md(text=(
