@@ -4,6 +4,7 @@ Summarizes docs/DATA_PIPELINE.md (two paired tracks: robot state-action + human 
 with the rendered sample videos embedded. Run in an env with the reports API (.venv, wandb 0.27).
 """
 import glob
+import json
 import os
 import wandb
 import wandb.apis.reports as wr
@@ -14,6 +15,22 @@ RUN_NAME = "data-pipeline"
 HERE = os.path.dirname(os.path.abspath(__file__))
 DOCS = os.path.join(os.path.dirname(HERE), "docs")
 md = wr.MarkdownBlock
+SA_STATS = os.path.join(os.path.dirname(HERE), "stage2", "out", "state_action_seed", "dataset_stats.json")
+
+
+def _reproduced_block():
+    if not os.path.exists(SA_STATS):
+        return ("_Full-schema `collect_state_action.py` + `pack_state_action.py` are built and "
+                "verified on this box; a dataset run is in progress._")
+    s = json.load(open(SA_STATS))
+    rows = ["| mode | trajectories | transitions | mean survival |", "|---|---|---|---|"]
+    for m, v in s["per_mode"].items():
+        rows.append(f"| {m} | {v['trajectories']} | {v['transitions']:,} | {v['mean_survival']} |")
+    return ("Actually collected here with `collect_state_action.py` (full §6 schema) → "
+            "`pack_state_action.py`:\n\n" + "\n".join(rows) +
+            f"\n\n**Total: {s['total_transitions']:,} transitions across {s['total_trajectories']} "
+            f"trajectories, mean survival {s['mean_survival_all']}.** (Seed subset; the numbers below "
+            "are the full documented run.)")
 
 # ── media run: the rendered robot sample videos ─────────────────────────────
 run = wandb.init(entity=ENTITY, project=PROJECT, name=RUN_NAME, id=RUN_NAME,
@@ -104,7 +121,10 @@ blocks = [
         "**Human** — `smpl_smplx/uniform/<clip>.npz`: `smpl_pose`(T,24,3), `smplx_pose`(T,55,3), "
         "`*_transl`(T,3), per-vertex fit error, `foot_corrected=True`.")),
 
-    wr.H2(text="Results (validation subset)"),
+    wr.H2(text="Reproduced on this box (Track A)"),
+    md(text=_reproduced_block()),
+
+    wr.H2(text="Results (validation subset, full run)"),
     md(text=(
         "| Dataset | Size |\n|---|---|\n"
         "| Robot state–action | **1,417,918 transitions**, mean survival **0.992** (onpolicy + teacher-forced) |\n"
