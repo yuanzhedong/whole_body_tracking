@@ -108,7 +108,7 @@ states BFM-Zero never visited → compounding error → fall. Three escalating f
 |---|---|---|---|
 | **0** confirm BFM-Zero I/O | action = 29-D pos-targets; `act`/`backward_map`/`project_z` signatures; z-dim | `humanoidverse/agents/fb/model.py` | ✅ done (§2) |
 | **1** data collector | `stage2/collect_bfmzero_pairs.py`: per-step `(s, r, a*, z)` with DR + DART noise → npz | `batch_tracking_inference.py` | **this PR (prototype)** |
-| **2** offline VAE-BC | train `MotionVAE` on triples (**sweep encoder horizon `H`**, §3); recon MSE, active dims, z-ablation | `vae_model.py`, `verify_vae.py` G1/G3 | next |
+| **2** offline VAE-BC | `stage2/train_control_vae.py`: train `MotionVAE` on triples (**sweep encoder horizon `H`**, §3); reports G1 recon RMSE + G3 active-dims/z-ablation | `vae_model.py` | **this PR (prototype, smoke-tested)** |
 | **3** closed-loop gate | run distilled VAE **policy** in MuJoCo; survival vs BFM-Zero (**hard gate G2**) | `verify_vae.py` G2, `stage3_sim2sim/` | next |
 | **4** DAgger (if G2 red) | student-rollout + BFM-Zero relabel in humanoidverse | `distill_vae.py` (teacher→BFM-Zero) | conditional |
 | **5** sim2sim | HV/Isaac-trained VAE → MuJoCo across DR seeds; survival/tracking vs BFM-Zero on near-ground suite | `run_l3_eval.py` pattern | next |
@@ -152,3 +152,16 @@ python stage2/collect_bfmzero_pairs.py \
 
 Emits `pairs_<mid>.npz` with `proprio[T,ds]`, `ref[T,dr]`, `action[T,29]`, `z[T,dz]` (+ meta), the
 `(s, r, a*)` dataset for phase 2.
+
+**Phase 2** (plain torch env, e.g. `.venv6`; no simulator):
+
+```bash
+.venv6/bin/python stage2/train_control_vae.py \
+    --data-dir <dataset_dir> --out stage2/out/control_vae \
+    --horizon 16 --latent 32 --beta 0.01 --align-coef 0.0 \
+    --epochs 50 --batch-size 1024 --lr 5e-4 --val-frac 0.1
+# sweep --horizon {1,8,16,32}; watch G3 z-ablation (>=0.1) and G1 recon RMSE.
+```
+
+Writes `control_vae.pt`, `normalization.npz`, `metrics.json` (G1 recon RMSE, G3 active dims +
+z-ablation). Closed-loop survival (**G2, the hard gate**) is phase 3.
