@@ -186,7 +186,7 @@ def main():
         observation = wrapped_env._get_g1env_observation(to_numpy=False)
 
         S, R, A = [], [], []
-        min_z = 1e9
+        fell = False
         for i in range(min(T, args.max_steps)):
             s_vec = flatten_obs(observation)
             a_star = model.act(observation, z_bfm[i % T].repeat(1, 1), mean=True)   # TEACHER label at student state
@@ -196,10 +196,12 @@ def main():
             a_env = torch.tensor(student_action(Rfull, i, s_vec), dtype=torch.float32)[None]
             observation, *_ = wrapped_env.step(a_env, to_numpy=False)
             qz = float(np.asarray(wrapped_env._get_qpos_qvel(to_numpy=True)[0]).reshape(-1)[2])
-            min_z = min(min_z, qz)
+            if qz < FALL_Z:            # TRUNCATE at fall: don't flood the buffer with fallen-state pairs
+                fell = True
+                break
         clip = {"s": np.stack(S).astype(np.float32), "r": np.stack(R).astype(np.float32),
                 "a": np.stack(A).astype(np.float32)}
-        return clip, float(min_z > FALL_Z)
+        return clip, 0.0 if fell else 1.0
 
     buffer, curve = [], []
     if args.bc_data_dir:
