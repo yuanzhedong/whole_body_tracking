@@ -28,7 +28,7 @@ import torch
 import torch.nn as nn
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from vae_model import MotionVAE, kl_divergence  # noqa: E402
+from vae_model import MotionVAE, DualHeadVAE, kl_divergence  # noqa: E402
 
 
 def load_pairs(data_dir):
@@ -76,6 +76,9 @@ def main():
     p.add_argument("--beta", type=float, default=0.01, help="KL coef (Table S6 default)")
     p.add_argument("--align-coef", type=float, default=0.0,
                    help=">0 ties z_hat to the BFM-Zero latent via a linear adapter")
+    p.add_argument("--motion-coef", type=float, default=0.0,
+                   help=">0 adds a motion-reconstruction head M(z)->ref (DualHeadVAE); forces z to "
+                        "encode motion (teacher-independent). 0 = single-head MotionVAE.")
     p.add_argument("--epochs", type=int, default=50)
     p.add_argument("--batch-size", type=int, default=1024)
     p.add_argument("--lr", type=float, default=5e-4)
@@ -113,8 +116,13 @@ def main():
     Zb_t = to(Zb)
     tr_t, va_t = to(tr), to(va)
 
-    model = MotionVAE(ref_dim=Xr.shape[1], proprio_dim=Xp.shape[1], act_dim=Ya.shape[1],
-                      latent=args.latent).to(dev)
+    dual = args.motion_coef > 0
+    if dual:
+        model = DualHeadVAE(ref_dim=Xr.shape[1], proprio_dim=Xp.shape[1], act_dim=Ya.shape[1],
+                            latent=args.latent).to(dev)
+    else:
+        model = MotionVAE(ref_dim=Xr.shape[1], proprio_dim=Xp.shape[1], act_dim=Ya.shape[1],
+                          latent=args.latent).to(dev)
     adapter = nn.Linear(args.latent, Zb.shape[1]).to(dev) if args.align_coef > 0 else None
     params = list(model.parameters()) + (list(adapter.parameters()) if adapter else [])
     opt = torch.optim.AdamW(params, lr=args.lr)
@@ -124,59 +132,73 @@ def main():
     for ep in range(args.epochs):
         model.train()
         perm_i = tr_idx[torch.randperm(len(tr_idx), device=dev)]
-        tot = {"rec": 0.0, "kl": 0.0, "al": 0.0, "n": 0}
+        tot = {"rec": 0.0, "kl": 0.0, "mo": 0.0, "n": 0}
         for s in range(0, len(perm_i), args.batch_size):
             b = perm_i[s:s + args.batch_size]
-            ah, mu, logvar = model(Xr_t[b], Xp_t[b], sample=True)
+            if dual:
+                ah, rhat, mu, logvar = model(Xr_t[b], Xp_t[b], sample=True)
+                mo = ((rhat - Xr_t[b]) ** 2).mean()
+            else:
+                ah, mu, logvar = model(Xr_t[b], Xp_t[b], sample=True)
+                mo = torch.tensor(0.0, device=dev)
             rec = ((ah - Ya_t[b]) ** 2).mean()
             kl = kl_divergence(mu, logvar)
-            loss = rec + args.beta * kl
-            al = torch.tensor(0.0, device=dev)
+            loss = rec + args.beta * kl + args.motion_coef * mo
             if adapter is not None:
-                al = ((adapter(mu) - Zb_t[b]) ** 2).mean()
-                loss = loss + args.align_coef * al
+                loss = loss + args.align_coef * ((adapter(mu) - Zb_t[b]) ** 2).mean()
             opt.zero_grad(); loss.backward(); opt.step()
             bs = len(b)
             tot["rec"] += rec.item() * bs; tot["kl"] += kl.item() * bs
-            tot["al"] += float(al.detach()) * bs; tot["n"] += bs
+            tot["mo"] += float(mo.detach()) * bs; tot["n"] += bs
         if ep % 10 == 0 or ep == args.epochs - 1:
-            m = evaluate(model, Xr_t, Xp_t, Ya_t, va_t, asd_t, args)
+            m = evaluate(model, Xr_t, Xp_t, Ya_t, va_t, asd_t, args, dual)
             print(f"ep {ep:3d} | train rec {tot['rec']/tot['n']:.4f} kl {tot['kl']/tot['n']:.3f} "
-                  f"al {tot['al']/tot['n']:.4f} | val rec_rmse {m['val_rec_rmse_raw']:.4f} "
-                  f"active {m['active_dims']}/{args.latent} z_abl {m['z_ablation']:.3f}")
+                  f"mo {tot['mo']/tot['n']:.4f} | val rec_rmse {m['val_rec_rmse_raw']:.4f} "
+                  f"active {m['active_dims']}/{args.latent} z_abl {m['z_ablation']:.3f} "
+                  f"mo_rmse {m['motion_rmse']:.3f} mo_zabl {m['motion_z_ablation']:.3f}")
 
-    metrics = evaluate(model, Xr_t, Xp_t, Ya_t, va_t, asd_t, args)
+    metrics = evaluate(model, Xr_t, Xp_t, Ya_t, va_t, asd_t, args, dual)
     torch.save({"state_dict": model.state_dict(),
                 "arch": {"ref_dim": Xr.shape[1], "proprio_dim": Xp.shape[1],
-                         "act_dim": Ya.shape[1], "latent": args.latent, "horizon": args.horizon}},
+                         "act_dim": Ya.shape[1], "latent": args.latent, "horizon": args.horizon,
+                         "dual_head": dual}},
                out / "control_vae.pt")
     np.savez(out / "normalization.npz", ref_mu=rmu, ref_sd=rsd, pro_mu=pmu, pro_sd=psd,
              act_mu=amu, act_sd=asd)
     json.dump({**metrics, "args": vars(args), "n_motions": n_mot, "n_samples": int(len(Xr))},
               open(out / "metrics.json", "w"), indent=2)
-    print("G1 recon_rmse(raw)=%.4f | G3 active=%d/%d z_ablation=%.3f -> %s" % (
-        metrics["val_rec_rmse_raw"], metrics["active_dims"], args.latent,
-        metrics["z_ablation"], out / "control_vae.pt"))
+    print("G1 recon_rmse(raw)=%.4f | G3 active=%d/%d z_ablation=%.3f | motion_rmse=%.3f "
+          "motion_z_ablation=%.3f -> %s" % (
+              metrics["val_rec_rmse_raw"], metrics["active_dims"], args.latent, metrics["z_ablation"],
+              metrics["motion_rmse"], metrics["motion_z_ablation"], out / "control_vae.pt"))
 
 
 @torch.no_grad()
-def evaluate(model, Xr, Xp, Ya, va_mask, asd_t, args):
-    """G1 recon RMSE (val, raw action units) + G3 active dims + z-ablation."""
+def evaluate(model, Xr, Xp, Ya, va_mask, asd_t, args, dual=False):
+    """G1 action recon RMSE + G3 active dims + z-ablation. Dual-head adds motion metrics."""
     model.eval()
     idx = torch.nonzero(va_mask).squeeze(1)
     if len(idx) == 0:
         idx = torch.arange(min(2048, Xr.shape[0]), device=Xr.device)
-    ah, mu, logvar = model(Xr[idx], Xp[idx], sample=False)
+    if dual:
+        ah, rhat, mu, logvar = model(Xr[idx], Xp[idx], sample=False)
+    else:
+        ah, mu, logvar = model(Xr[idx], Xp[idx], sample=False)
     rec_norm = torch.sqrt(((ah - Ya[idx]) ** 2).mean()).item()
     rec_raw = torch.sqrt(((ah - Ya[idx]) ** 2 * asd_t ** 2).mean()).item()  # de-standardized
-    # G3 active dims: per-dim KL contribution averaged over the val set
     kl_dim = (0.5 * (mu ** 2 + logvar.exp() - logvar - 1)).mean(0)
     active = int((kl_dim > 0.01).sum().item())
-    # G3 z-ablation: how much the latent moves the action vs decoding from z=0
-    a_z0 = model.decode(torch.zeros_like(mu), Xp[idx])
+    z0 = torch.zeros_like(mu)
+    a_z0 = model.decode_action(z0, Xp[idx]) if dual else model.decode(z0, Xp[idx])
     z_abl = (torch.norm(ah - a_z0, dim=-1).mean() / (torch.norm(ah, dim=-1).mean() + 1e-6)).item()
-    return {"val_rec_rmse_norm": rec_norm, "val_rec_rmse_raw": rec_raw,
-            "active_dims": active, "z_ablation": z_abl}
+    # dual-head: does z encode the MOTION? recon quality + how much motion depends on z
+    motion_rmse, motion_z_abl = 0.0, 0.0
+    if dual:
+        motion_rmse = torch.sqrt(((rhat - Xr[idx]) ** 2).mean()).item()
+        r_z0 = model.decode_motion(z0)
+        motion_z_abl = (torch.norm(rhat - r_z0, dim=-1).mean() / (torch.norm(rhat, dim=-1).mean() + 1e-6)).item()
+    return {"val_rec_rmse_norm": rec_norm, "val_rec_rmse_raw": rec_raw, "active_dims": active,
+            "z_ablation": z_abl, "motion_rmse": motion_rmse, "motion_z_ablation": motion_z_abl}
 
 
 if __name__ == "__main__":
