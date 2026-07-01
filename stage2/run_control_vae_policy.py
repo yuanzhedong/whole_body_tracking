@@ -31,7 +31,7 @@ from humanoidverse.agents.envs.humanoidverse_isaac import HumanoidVerseIsaacConf
 from humanoidverse.utils.helpers import get_backward_observation
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from vae_model import MotionVAE  # noqa: E402
+from vae_model import MotionVAE, DualHeadVAE  # noqa: E402
 
 FALL_Z = 0.4  # root height below this = fallen (standing G1 pelvis ~0.75 m)
 
@@ -43,13 +43,15 @@ def flatten_obs(obs):
     return np.asarray(t, np.float32).reshape(-1)
 
 
-def load_vae(ckpt_dir):
-    ck = torch.load(Path(ckpt_dir) / "control_vae.pt", map_location="cpu", weights_only=False)
+def load_vae(ckpt_dir, ckpt_name="control_vae.pt"):
+    ck = torch.load(Path(ckpt_dir) / ckpt_name, map_location="cpu", weights_only=False)
     a = ck["arch"]
-    m = MotionVAE(ref_dim=a["ref_dim"], proprio_dim=a["proprio_dim"], act_dim=a["act_dim"], latent=a["latent"])
+    dual = bool(a.get("dual_head", False))
+    Cls = DualHeadVAE if dual else MotionVAE
+    m = Cls(ref_dim=a["ref_dim"], proprio_dim=a["proprio_dim"], act_dim=a["act_dim"], latent=a["latent"])
     m.load_state_dict(ck["state_dict"]); m.eval()
     nz = np.load(Path(ckpt_dir) / "normalization.npz")
-    return m, a["horizon"], {k: nz[k].astype(np.float32) for k in nz.files}
+    return m, a["horizon"], {k: nz[k].astype(np.float32) for k in nz.files}, dual
 
 
 def survival_and_track(exec_q, ref_dof):
@@ -69,12 +71,13 @@ def main():
     p.add_argument("--out", default="stage2/out/g2_eval")
     p.add_argument("--num-clips", type=int, default=30)
     p.add_argument("--max-steps", type=int, default=300)
+    p.add_argument("--ckpt-name", default="control_vae.pt", help="e.g. control_vae_dagger.pt for DAgger output")
     p.add_argument("--device", default="cuda")
     args = p.parse_args()
 
     out = Path(args.out); out.mkdir(parents=True, exist_ok=True)
-    vae, H, norm = load_vae(args.ckpt_dir)
-    print(f"VAE: H={H} latent={vae.latent} ref_dim={vae.ref_dim} | ckpt={args.ckpt_dir}")
+    vae, H, norm, dual = load_vae(args.ckpt_dir, args.ckpt_name)
+    print(f"VAE: H={H} latent={vae.latent} head={'dual' if dual else 'single'} | ckpt={args.ckpt_dir}")
 
     @torch.no_grad()
     def vae_action(Rfull, t, proprio, use_latent):
@@ -82,7 +85,8 @@ def main():
         w = ((Rfull[idx].reshape(-1) - norm["ref_mu"]) / norm["ref_sd"]).astype(np.float32)
         s = ((proprio - norm["pro_mu"]) / norm["pro_sd"]).astype(np.float32)
         mu, _ = vae.encode(torch.tensor(w)[None]) if use_latent else (torch.zeros(1, vae.latent), None)
-        a = vae.decode(mu, torch.tensor(s)[None]).numpy()[0]
+        st = torch.tensor(s)[None]
+        a = (vae.decode_action(mu, st) if dual else vae.decode(mu, st)).numpy()[0]
         return (a * norm["act_sd"] + norm["act_mu"]).astype(np.float32)
 
     model = load_model_from_checkpoint_dir(Path(args.model_folder) / "checkpoint", device=args.device)

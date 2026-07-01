@@ -33,7 +33,7 @@ from humanoidverse.agents.envs.humanoidverse_isaac import HumanoidVerseIsaacConf
 from humanoidverse.utils.helpers import get_backward_observation
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from vae_model import MotionVAE, kl_divergence  # noqa: E402
+from vae_model import MotionVAE, DualHeadVAE, kl_divergence  # noqa: E402
 
 FALL_Z = 0.4
 
@@ -48,10 +48,25 @@ def flatten_obs(obs):
 def load_warm(ckpt_dir):
     ck = torch.load(Path(ckpt_dir) / "control_vae.pt", map_location="cpu", weights_only=False)
     a = ck["arch"]
-    m = MotionVAE(ref_dim=a["ref_dim"], proprio_dim=a["proprio_dim"], act_dim=a["act_dim"], latent=a["latent"])
+    dual = bool(a.get("dual_head", False))
+    Cls = DualHeadVAE if dual else MotionVAE
+    m = Cls(ref_dim=a["ref_dim"], proprio_dim=a["proprio_dim"], act_dim=a["act_dim"], latent=a["latent"])
     m.load_state_dict(ck["state_dict"])
     nz = np.load(Path(ckpt_dir) / "normalization.npz")
-    return m, a["horizon"], {k: nz[k].astype(np.float32) for k in nz.files}
+    return m, a["horizon"], {k: nz[k].astype(np.float32) for k in nz.files}, dual
+
+
+def load_bc_buffer(data_dir):
+    """Seed the DAgger buffer with the original BC collection (pairs_<mid>.npz) so
+    retraining always retains good teacher-state coverage (D <- D_BC U new)."""
+    import glob
+    out = []
+    for f in sorted(glob.glob(str(Path(data_dir) / "pairs_*.npz"))):
+        d = np.load(f)
+        out.append({"s": np.asarray(d["proprio"], np.float32),
+                    "r": np.asarray(d["ref"], np.float32),
+                    "a": np.asarray(d["action"], np.float32)})
+    return out
 
 
 def build_windows(buffer, H):
@@ -66,7 +81,8 @@ def build_windows(buffer, H):
     return np.stack(Xr).astype(np.float32), np.stack(Xp).astype(np.float32), np.stack(Ya).astype(np.float32)
 
 
-def train_on_buffer(vae, buffer, norm, H, epochs, dev, beta=0.01, bs=1024, lr=5e-4):
+def train_on_buffer(vae, buffer, norm, H, epochs, dev, beta=0.01, bs=1024, lr=5e-4,
+                    dual=False, motion_coef=0.0):
     Xr, Xp, Ya = build_windows(buffer, H)
     xr = torch.tensor((Xr - norm["ref_mu"]) / norm["ref_sd"], device=dev)
     xp = torch.tensor((Xp - norm["pro_mu"]) / norm["pro_sd"], device=dev)
@@ -78,8 +94,13 @@ def train_on_buffer(vae, buffer, norm, H, epochs, dev, beta=0.01, bs=1024, lr=5e
         perm = torch.randperm(n, device=dev)
         for s in range(0, n, bs):
             b = perm[s:s + bs]
-            ah, mu, logvar = vae(xr[b], xp[b], sample=True)
-            loss = ((ah - ya[b]) ** 2).mean() + beta * kl_divergence(mu, logvar)
+            if dual:
+                ah, rhat, mu, logvar = vae(xr[b], xp[b], sample=True)
+                loss = ((ah - ya[b]) ** 2).mean() + beta * kl_divergence(mu, logvar) \
+                    + motion_coef * ((rhat - xr[b]) ** 2).mean()
+            else:
+                ah, mu, logvar = vae(xr[b], xp[b], sample=True)
+                loss = ((ah - ya[b]) ** 2).mean() + beta * kl_divergence(mu, logvar)
             opt.zero_grad(); loss.backward(); opt.step()
     vae.eval()
     return n
@@ -96,14 +117,21 @@ def main():
     p.add_argument("--epochs-per-iter", type=int, default=40)
     p.add_argument("--max-steps", type=int, default=300)
     p.add_argument("--beta", type=float, default=0.01)
+    p.add_argument("--motion-coef", type=float, default=0.0,
+                   help="motion-recon weight for dual-head warm-starts (kept during DAgger retrain)")
+    p.add_argument("--bc-data-dir", default=None,
+                   help="seed the buffer with this BC collection (pairs_*.npz) — prevents DAgger "
+                        "forgetting good teacher-state behavior (fixes divergence)")
     p.add_argument("--device", default="cuda")
     args = p.parse_args()
 
     out = Path(args.out); out.mkdir(parents=True, exist_ok=True)
     dev = args.device
-    vae, H, norm = load_warm(args.warm_start_ckpt)
+    vae, H, norm, dual = load_warm(args.warm_start_ckpt)
     vae.to(dev)
-    print(f"DAgger: warm-start {args.warm_start_ckpt} | H={H} latent={vae.latent} | iters={args.iters}")
+    mcoef = args.motion_coef if dual else 0.0
+    print(f"DAgger: warm-start {args.warm_start_ckpt} | H={H} latent={vae.latent} "
+          f"| head={'dual' if dual else 'single'} motion_coef={mcoef} | iters={args.iters}")
 
     @torch.no_grad()
     def student_action(Rfull, t, proprio):
@@ -111,7 +139,8 @@ def main():
         w = ((Rfull[idx].reshape(-1) - norm["ref_mu"]) / norm["ref_sd"]).astype(np.float32)
         s = ((proprio - norm["pro_mu"]) / norm["pro_sd"]).astype(np.float32)
         mu, _ = vae.encode(torch.tensor(w, device=dev)[None])
-        a = vae.decode(mu, torch.tensor(s, device=dev)[None]).cpu().numpy()[0]
+        st = torch.tensor(s, device=dev)[None]
+        a = (vae.decode_action(mu, st) if dual else vae.decode(mu, st)).cpu().numpy()[0]
         return (a * norm["act_sd"] + norm["act_mu"]).astype(np.float32)
 
     model = load_model_from_checkpoint_dir(Path(args.model_folder) / "checkpoint", device=dev)
@@ -173,6 +202,10 @@ def main():
         return clip, float(min_z > FALL_Z)
 
     buffer, curve = [], []
+    if args.bc_data_dir:
+        buffer = load_bc_buffer(args.bc_data_dir)
+        print(f"seeded buffer with {len(buffer)} BC clips from {args.bc_data_dir}")
+    n_bc = len(buffer)
     for it in range(args.iters):
         surv = []
         for mid in range(n_clips):
@@ -182,13 +215,15 @@ def main():
             except Exception as e:
                 print(f"  iter{it} clip{mid} FAIL {repr(e)[:100]}")
         student_surv = float(np.mean(surv)) if surv else 0.0
-        n_samp = train_on_buffer(vae, buffer, norm, H, args.epochs_per_iter, dev, beta=args.beta)
+        n_samp = train_on_buffer(vae, buffer, norm, H, args.epochs_per_iter, dev, beta=args.beta,
+                                 dual=dual, motion_coef=mcoef)
         curve.append({"iter": it, "student_survival": round(student_surv, 3),
                       "buffer_clips": len(buffer), "train_samples": int(n_samp)})
         print(f"[iter {it}] student survival={student_surv:.3f} | buffer={len(buffer)} clips, {n_samp} samples")
         torch.save({"state_dict": vae.state_dict(),
                     "arch": {"ref_dim": vae.ref_dim, "proprio_dim": vae.proprio_dim,
-                             "act_dim": vae.act_dim, "latent": vae.latent, "horizon": H}},
+                             "act_dim": vae.act_dim, "latent": vae.latent, "horizon": H,
+                             "dual_head": dual}},
                    out / "control_vae_dagger.pt")
         np.savez(out / "normalization.npz", **norm)
         json.dump({"curve": curve, "warm_start": args.warm_start_ckpt},
