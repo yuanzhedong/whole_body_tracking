@@ -115,11 +115,11 @@ DR, so match its ranges first, then widen.</p>
 </table>
 <p>Phase-2 HP sweep on <code>seed40</code> — grid
 <code>H∈{1,8,16,32} × latent∈{16,32,64} × β∈{1e-3,1e-2,1e-1} × align∈{0,0.5}</code> (72 runs) across the
-RTX PRO 6000 Blackwell / 4090 GPUs. <span class="tag t-run">running</span></p>
+RTX PRO 6000 Blackwell / 4090 GPUs. <span class="tag t-done">complete (72/72)</span></p>
 
 <div class="callout bad">
 <b>⚠ Key finding (decision-guiding): the latent collapses.</b>
-Across <b>60+ configs</b>, the max <b>z-ablation is 0.016</b> — far below the G3 gate of 0.1 — while
+Across <b>all 72 configs</b>, the max <b>z-ablation is 0.016</b> — far below the G3 gate of 0.1 — while
 reconstruction is uniformly good (val RMSE ≈ 0.10–0.11 in action units). <b>No hyperparameter rescues it.</b>
 Interpretation: the <b>929-D proprio observation already determines BFM-Zero's action</b>, so the decoder
 reconstructs from proprio alone and <b>ignores the latent</b> (posterior collapse from over-informative
@@ -164,7 +164,7 @@ ablation on the existing pairs, no re-collection.
 <tr><th>phase</th><th>deliverable</th><th>status</th></tr>
 <tr><td>0</td><td>confirm BFM-Zero I/O (action = 29-D pos-targets; z on √d-sphere)</td><td><span class="tag t-done">done</span></td></tr>
 <tr><td>1</td><td><code>collect_bfmzero_pairs.py</code> — per-step (s,r,a*,z) with DR + DART</td><td><span class="tag t-done">built</span> · <span class="tag t-run">collecting</span></td></tr>
-<tr><td>2</td><td><code>train_control_vae.py</code> + <code>sweep_control_vae.py</code> — sweep H; G1/G3 metrics</td><td><span class="tag t-done">built</span> · <span class="tag t-run">sweeping</span></td></tr>
+<tr><td>2</td><td><code>train_control_vae.py</code> + <code>sweep_control_vae.py</code> — sweep H; G1/G3 metrics</td><td><span class="tag t-done">done (72/72)</span></td></tr>
 <tr><td>2b</td><td>decoder-input ablation (strip reference from proprio) — the finding above</td><td><span class="tag t-next">next</span></td></tr>
 <tr><td>3</td><td>closed-loop: run the VAE as a policy in MuJoCo; survival vs BFM-Zero (G2)</td><td><span class="tag t-next">next</span></td></tr>
 <tr><td>4</td><td>DAgger (if G2 red) — student rollout + BFM-Zero relabel</td><td><span class="tag t-next">conditional</span></td></tr>
