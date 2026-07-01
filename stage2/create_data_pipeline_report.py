@@ -20,7 +20,7 @@ HERE = os.path.dirname(os.path.abspath(__file__))
 DOCS = os.path.join(os.path.dirname(HERE), "docs")
 SA_STATS = os.path.join(HERE, "out", "state_action_seed", "dataset_stats.json")
 md = wr.MarkdownBlock
-N_SHOWN = 36  # videos rendered as visible panels (rest still logged/browsable)
+N_SHOWN = 60  # videos rendered as visible panels (rest still logged/browsable)
 
 
 def reproduced_block():
