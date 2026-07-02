@@ -38,24 +38,33 @@ def reproduced_block():
             "clips than the full-corpus number below).")
 
 
-# ── media run: log all rendered robot sample videos ─────────────────────────────
-run = wandb.init(entity=ENTITY, project=PROJECT, name=RUN_NAME, id=RUN_NAME,
-                 resume="allow", job_type="analysis", reinit=True)
+N_DEMO_LOG = 24   # cap robot demos LOGGED to W&B (avoid storage bloat; local set is larger)
+
+# storage hygiene: delete the previous media run(s) so re-logging never accumulates copies
+try:
+    _api = wandb.Api()
+    for r in _api.runs(f"{ENTITY}/{PROJECT}"):
+        if r.name == RUN_NAME:
+            r.delete(delete_artifacts=True)
+except Exception as e:
+    print("prior-run cleanup skipped:", str(e)[:100])
+
+# ── media run: log a CURATED set once ───────────────────────────────────────────
+run = wandb.init(entity=ENTITY, project=PROJECT, name=RUN_NAME, job_type="analysis", reinit=True)
 media, keys, trip_keys = {}, [], []
-# triptychs [ human | G1 ref | G1 executed ] first
-for p in sorted(glob.glob(os.path.join(DOCS, "triptych", "*.mp4"))):
+for p in sorted(glob.glob(os.path.join(DOCS, "triptych", "*.mp4"))):          # all triptychs (the deliverable)
     k = "trip_" + os.path.splitext(os.path.basename(p))[0]; media[k] = wandb.Video(p, fps=30); trip_keys.append(k)
-# robot-only 2-panel gallery
+demo_paths = sorted(glob.glob(os.path.join(DOCS, "demo", "*.mp4")))[:N_DEMO_LOG]  # curated robot subset
 for fn in ["sample_Neutral_kick_trash_001__A057.mp4", "sample_jog_squat_A492.mp4"]:
     p = os.path.join(DOCS, fn)
     if os.path.exists(p):
         k = "demo_" + os.path.splitext(fn)[0].replace("sample_", ""); media[k] = wandb.Video(p, fps=30); keys.append(k)
-for p in sorted(glob.glob(os.path.join(DOCS, "demo", "*.mp4"))):
+for p in demo_paths:
     k = "demo_" + os.path.splitext(os.path.basename(p))[0]; media[k] = wandb.Video(p, fps=30); keys.append(k)
 if media:
     run.log(media)
 run.finish()
-print(f"logged {len(trip_keys)} triptychs + {len(keys)} robot demos")
+print(f"logged {len(trip_keys)} triptychs + {len(keys)} robot demos (curated)")
 
 
 def runset():
