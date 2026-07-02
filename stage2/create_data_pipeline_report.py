@@ -41,7 +41,11 @@ def reproduced_block():
 # ── media run: log all rendered robot sample videos ─────────────────────────────
 run = wandb.init(entity=ENTITY, project=PROJECT, name=RUN_NAME, id=RUN_NAME,
                  resume="allow", job_type="analysis", reinit=True)
-media, keys = {}, []
+media, keys, trip_keys = {}, [], []
+# triptychs [ human | G1 ref | G1 executed ] first
+for p in sorted(glob.glob(os.path.join(DOCS, "triptych", "*.mp4"))):
+    k = "trip_" + os.path.splitext(os.path.basename(p))[0]; media[k] = wandb.Video(p, fps=30); trip_keys.append(k)
+# robot-only 2-panel gallery
 for fn in ["sample_Neutral_kick_trash_001__A057.mp4", "sample_jog_squat_A492.mp4"]:
     p = os.path.join(DOCS, fn)
     if os.path.exists(p):
@@ -51,7 +55,7 @@ for p in sorted(glob.glob(os.path.join(DOCS, "demo", "*.mp4"))):
 if media:
     run.log(media)
 run.finish()
-print(f"logged {len(keys)} demo videos")
+print(f"logged {len(trip_keys)} triptychs + {len(keys)} robot demos")
 
 
 def runset():
@@ -75,16 +79,19 @@ blocks = [
         "**(B) human SMPL / SMPL-X** — the same motions as foot-corrected body params. Full spec: "
         "`docs/DATA_PIPELINE.md`.")),
 
-    wr.H2(text="Target output vs. what is reproduced here"),
+    wr.H2(text="Triptych — [ human motion | G1 reference | G1 executed ]"),
     md(text=(
-        "The full pipeline renders a **triptych** `[ SMPL human | G1 reference | G1 executed ]`. "
-        "**On this box** we reproduce **Track A** (robot) end-to-end — the two G1 panels below are "
-        "real BFM-Zero rollouts. **Track B** (the pink SMPL human panel) needs external **SOMA-X** + "
-        "gated **SMPL/SMPL-X** body models + the human **BVH** (none present here), so the galleries "
-        "below show the **robot 2-panel** `[ reference retarget | BFM-Zero executed ]`. Adding the "
-        "human panel just requires those Track-B assets — the render code stitches it as a third column.")),
+        "The full pipeline output: the **human motion** (BONES-SEED `soma_uniform` BVH, downloaded "
+        "from HuggingFace and rendered as an FK skeleton via SOMA-X's bundled MHR rig — **no gated "
+        "SMPL models needed**), the **G1 reference** retarget, and the **BFM-Zero executed** rollout, "
+        "time-aligned at 1440×480. Both tracks are reproduced on this box "
+        "(`stage2/render_triptych.py`). _The human is shown as a skeleton; the SOMA/MHR **mesh** "
+        "renders (verified in T-pose) but its per-joint pose convention is a documented refinement._")),
+    wr.PanelGrid(runsets=[runset()],
+                 panels=[wr.MediaBrowser(media_keys=trip_keys[i:i + 2], num_columns=2)
+                         for i in range(0, min(12, len(trip_keys)), 2)]),
 
-    wr.H2(text=f"Sample gallery — {len(keys)} rendered clips (showing {min(N_SHOWN, len(keys))})"),
+    wr.H2(text=f"Robot gallery — {len(keys)} rendered clips (showing {min(N_SHOWN, len(keys))})"),
     md(text=(
         "Diverse BONES-SEED motions — locomotion, crouch/squat/sit, jump, turn, dance, kick, punch, "
         "bow, crawl, ladder-climb — each `[ Reference (retarget) | BFM-Zero executed ]`, rendered with "
