@@ -43,5 +43,15 @@ _build
 *.zarr
 *.npz
 
+# rendered media (logged to W&B, not committed)
+*.mp4
+stage3_sim2sim/bfmzero_compare/*.png
+
+# debug/intermediate sim2sim outputs (underscore-prefixed; results files have no underscore)
+stage3_sim2sim/bfmzero_compare/_*.json
+
+# local Claude Code config
+.claude/
+
 **/assets/
 artifacts/

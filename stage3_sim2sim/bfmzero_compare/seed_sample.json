@@ -1,0 +1,202 @@
+[
+  {
+    "idx": 0,
+    "artifact": "polite_bow_R_001__A432_M:v0",
+    "holo_surv_sweep": 1.0
+  },
+  {
+    "idx": 1,
+    "artifact": "body_stretch_1_003__A051:v0",
+    "holo_surv_sweep": 1.0
+  },
+  {
+    "idx": 2,
+    "artifact": "injured_R_leg_idle_loop_003__A230:v0",
+    "holo_surv_sweep": 1.0
+  },
+  {
+    "idx": 3,
+    "artifact": "sit_on_chair_start_R_001__A167:v0",
+    "holo_surv_sweep": 0.766
+  },
+  {
+    "idx": 4,
+    "artifact": "walk_forward_stop_002__A034:v0",
+    "holo_surv_sweep": 1.0
+  },
+  {
+    "idx": 5,
+    "artifact": "jog_avoid_bump_spin_270_R_004__A166:v0",
+    "holo_surv_sweep": 1.0
+  },
+  {
+    "idx": 6,
+    "artifact": "eureka_R_001__A187:v0",
+    "holo_surv_sweep": 1.0
+  },
+  {
+    "idx": 7,
+    "artifact": "h_b_w_crouch_270_start_003__A552_M:v0",
+    "holo_surv_sweep": 0.094
+  },
+  {
+    "idx": 8,
+    "artifact": "itching_right_calf_R_003__A405:v0",
+    "holo_surv_sweep": 0.992
+  },
+  {
+    "idx": 9,
+    "artifact": "looking_around_on_ground_002__A271_M:v0",
+    "holo_surv_sweep": 1.0
+  },
+  {
+    "idx": 10,
+    "artifact": "punch_self_face_R_004__A533:v0",
+    "holo_surv_sweep": 0.711
+  },
+  {
+    "idx": 11,
+    "artifact": "Turn_Start_Jog_0225_001__A017_M:v0",
+    "holo_surv_sweep": 1.0
+  },
+  {
+    "idx": 12,
+    "artifact": "operating_microwave_R_005__A298:v0",
+    "holo_surv_sweep": 1.0
+  },
+  {
+    "idx": 13,
+    "artifact": "walk_sideway_090_stop_002__A024:v0",
+    "holo_surv_sweep": 1.0
+  },
+  {
+    "idx": 14,
+    "artifact": "sit_cross_legged_loop_R_001__A414:v0",
+    "holo_surv_sweep": 0.203
+  },
+  {
+    "idx": 15,
+    "artifact": "squat_001__A360:v0",
+    "holo_surv_sweep": 0.352
+  },
+  {
+    "idx": 16,
+    "artifact": "steet_taxi_wave_002__A426:v0",
+    "holo_surv_sweep": 1.0
+  },
+  {
+    "idx": 17,
+    "artifact": "dance_hiphop_farmer_R_fast_002__A317:v0",
+    "holo_surv_sweep": 1.0
+  },
+  {
+    "idx": 18,
+    "artifact": "crouch_idle_right_R_003__A247_M:v0",
+    "holo_surv_sweep": 0.078
+  },
+  {
+    "idx": 19,
+    "artifact": "reaching_down_R_001__A260:v0",
+    "holo_surv_sweep": 0.438
+  },
+  {
+    "idx": 20,
+    "artifact": "change_idle_to_idle_left_006__A035_M:v0",
+    "holo_surv_sweep": 1.0
+  },
+  {
+    "idx": 21,
+    "artifact": "mohak_backward_stop_001__A034_M:v0",
+    "holo_surv_sweep": 0.039
+  },
+  {
+    "idx": 22,
+    "artifact": "crouch_ff_start_270_R_001__A197_M:v0",
+    "holo_surv_sweep": 0.188
+  },
+  {
+    "idx": 23,
+    "artifact": "walk_forward_injured_L_leg_002__A005:v0",
+    "holo_surv_sweep": 1.0
+  },
+  {
+    "idx": 24,
+    "artifact": "sit_on_chair_stop_R_001__A047:v0",
+    "holo_surv_sweep": 0.18
+  },
+  {
+    "idx": 25,
+    "artifact": "dancing_routine_2_004__A043_M:v0",
+    "holo_surv_sweep": 1.0
+  },
+  {
+    "idx": 26,
+    "artifact": "turn_jump_0135_002__A025_M:v0",
+    "holo_surv_sweep": 1.0
+  },
+  {
+    "idx": 27,
+    "artifact": "knightly_bow_R_002__A430_M:v0",
+    "holo_surv_sweep": 1.0
+  },
+  {
+    "idx": 28,
+    "artifact": "injured_torso_kick_trash_001__A057_M:v0",
+    "holo_surv_sweep": 1.0
+  },
+  {
+    "idx": 29,
+    "artifact": "fancy_spin_R_001__A430:v0",
+    "holo_surv_sweep": 0.852
+  },
+  {
+    "idx": 30,
+    "artifact": "idle_crawl_stop_003__A128:v0",
+    "holo_surv_sweep": 0.0
+  },
+  {
+    "idx": 31,
+    "artifact": "reaching_far_R_001__A406_M:v0",
+    "holo_surv_sweep": 1.0
+  },
+  {
+    "idx": 32,
+    "artifact": "screaming_003__A234_M:v0",
+    "holo_surv_sweep": 0.477
+  },
+  {
+    "idx": 33,
+    "artifact": "crouch_ff_start_180_R_003__A145_M:v0",
+    "holo_surv_sweep": 0.234
+  },
+  {
+    "idx": 34,
+    "artifact": "reaching_up_R_001__A047:v0",
+    "holo_surv_sweep": 1.0
+  },
+  {
+    "idx": 35,
+    "artifact": "idle_loop_003__A051:v0",
+    "holo_surv_sweep": 1.0
+  },
+  {
+    "idx": 36,
+    "artifact": "walk_180_R_003__A327_M:v0",
+    "holo_surv_sweep": 1.0
+  },
+  {
+    "idx": 37,
+    "artifact": "panic_run_away_180_R_001__A432:v0",
+    "holo_surv_sweep": 0.836
+  },
+  {
+    "idx": 38,
+    "artifact": "jog_avoid_bump_spin_270_R_011__A187:v0",
+    "holo_surv_sweep": 0.859
+  },
+  {
+    "idx": 39,
+    "artifact": "dance_latino_kick_kick_R_002__A321:v0",
+    "holo_surv_sweep": 1.0
+  }
+]

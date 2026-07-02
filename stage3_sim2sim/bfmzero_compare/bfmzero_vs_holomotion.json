@@ -1,0 +1,62 @@
+[
+  {
+    "clip": "crouch_ff_start_180_R_003__A145_M",
+    "cid": "clip0",
+    "motion": "deep crouch",
+    "holo_survival": 0.19,
+    "holo_survival_rel": 0.42,
+    "holo_joint_deg": 49.4,
+    "holo_z_mae": 0.23,
+    "bfm_survival": 0.58,
+    "bfm_survival_rel": 1.0,
+    "bfm_joint_deg": 19.1,
+    "bfm_z_mae": 0.136,
+    "ref_z_min": 0.2,
+    "n": 265
+  },
+  {
+    "clip": "squat_002__A359",
+    "cid": "clip1",
+    "motion": "squat (start standing)",
+    "holo_survival": 0.19,
+    "holo_survival_rel": 0.3,
+    "holo_joint_deg": 42.1,
+    "holo_z_mae": 0.388,
+    "bfm_survival": 0.88,
+    "bfm_survival_rel": 1.0,
+    "bfm_joint_deg": 15.4,
+    "bfm_z_mae": 0.056,
+    "ref_z_min": 0.22,
+    "n": 415
+  },
+  {
+    "clip": "sit_on_chair_stop_R_001__A047",
+    "cid": "clip2",
+    "motion": "sit on chair",
+    "holo_survival": 0.14,
+    "holo_survival_rel": 0.16,
+    "holo_joint_deg": 26.4,
+    "holo_z_mae": 0.49,
+    "bfm_survival": 1.0,
+    "bfm_survival_rel": 1.0,
+    "bfm_joint_deg": 9.8,
+    "bfm_z_mae": 0.045,
+    "ref_z_min": 0.42,
+    "n": 265
+  },
+  {
+    "clip": "squat_001__A360",
+    "cid": "clip3",
+    "motion": "squat",
+    "holo_survival": 0.16,
+    "holo_survival_rel": 0.23,
+    "holo_joint_deg": 40.0,
+    "holo_z_mae": 0.41,
+    "bfm_survival": 0.9,
+    "bfm_survival_rel": 1.0,
+    "bfm_joint_deg": 11.4,
+    "bfm_z_mae": 0.036,
+    "ref_z_min": 0.27,
+    "n": 482
+  }
+]

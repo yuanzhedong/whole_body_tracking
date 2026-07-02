@@ -73,6 +73,8 @@ class MotionCommand(CommandTerm):
 
         self.motion = MotionLoader(self.cfg.motion_file, self.body_indexes, device=self.device)
         self.time_steps = torch.zeros(self.num_envs, dtype=torch.long, device=self.device)
+        # Per-episode reference bias (correlated noise aug); zeros unless cfg.ref_bias_scale > 0.
+        self.ref_bias = torch.zeros(self.num_envs, self.motion.joint_pos.shape[1], device=self.device)
         self.body_pos_relative_w = torch.zeros(self.num_envs, len(cfg.body_names), 3, device=self.device)
         self.body_quat_relative_w = torch.zeros(self.num_envs, len(cfg.body_names), 4, device=self.device)
         self.body_quat_relative_w[:, :, 0] = 1.0
@@ -99,7 +101,7 @@ class MotionCommand(CommandTerm):
 
     @property
     def command(self) -> torch.Tensor:  # TODO Consider again if this is the best observation
-        return torch.cat([self.joint_pos, self.joint_vel], dim=1)
+        return torch.cat([self.joint_pos + self.ref_bias, self.joint_vel], dim=1)
 
     @property
     def joint_pos(self) -> torch.Tensor:
@@ -245,6 +247,12 @@ class MotionCommand(CommandTerm):
             return
         self._adaptive_sampling(env_ids)
 
+        # Resample the per-episode reference bias (correlated noise aug) for the reset envs.
+        if self.cfg.ref_bias_scale > 0.0:
+            self.ref_bias[env_ids] = sample_uniform(
+                -self.cfg.ref_bias_scale, self.cfg.ref_bias_scale, self.ref_bias[env_ids].shape, device=self.device
+            )
+
         root_pos = self.body_pos_w[:, 0].clone()
         root_ori = self.body_quat_w[:, 0].clone()
         root_lin_vel = self.body_lin_vel_w[:, 0].clone()
@@ -364,6 +372,12 @@ class MotionCommandCfg(CommandTermCfg):
     velocity_range: dict[str, tuple[float, float]] = {}
 
     joint_position_range: tuple[float, float] = (-0.52, 0.52)
+
+    ref_bias_scale: float = 0.0
+    """Per-episode reference-noise augmentation: if >0, add a per-env, per-joint bias sampled once
+    per episode from U(-scale, scale) to the reference `command` observation ONLY (not the reward).
+    Temporally correlated (constant within an episode) to mimic a VAE/diffusion's consistent
+    reconstruction offset, so the policy learns a wider basin around an imperfect reference. 0 = off."""
 
     adaptive_kernel_size: int = 1
     adaptive_lambda: float = 0.8

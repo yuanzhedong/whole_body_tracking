@@ -1,0 +1,36 @@
+# .venv6 core requirements — Blackwell-capable (sm_120) Python 3.12 env for the
+# seed -> UniMoTok VAE -> BFM-Zero -> sim2sim pipeline (Isaac-free path).
+#
+# torch is the CUDA 12.8 build. Install the torch trio FROM THE cu128 INDEX FIRST:
+#   uv venv --python 3.12 .venv6  &&  source .venv6/bin/activate
+#   uv pip install --index-url https://download.pytorch.org/whl/cu128 \
+#       torch==2.10.0+cu128 torchvision==0.25.0+cu128 torchaudio==2.10.0+cu128
+#   uv pip install -r docs/requirements-venv6-core.txt
+#
+# For Stage 4 (physics tracker) add onnxruntime-gpu + the OMG/BFM-Zero repos in
+# their own env (external; see HANDOFF.md).
+# For the FULL captured environment (incl. Isaac Sim 6.0) see requirements-venv6.txt.
+
+# --- torch trio (install from cu128 index, see header) ---
+torch==2.10.0+cu128
+torchvision==0.25.0+cu128
+torchaudio==2.10.0+cu128
+
+# --- pipeline core (Stage 1 features + Stage 3 inverse + MuJoCo) ---
+numpy==2.3.1
+scipy==1.17.0
+joblib==1.5.3
+mujoco==3.5.0
+mujoco-warp==3.5.0.2
+opencv-python-headless==4.13.0.90
+trimesh==4.11.1
+numpy-stl==3.2.0
+
+# --- VAE inference (Stage 2/3): load+decode the checkpoint ---
+# VERIFIED 2026-06-28: loads the 61M-param FINAL ckpt and decodes a real clip on
+# RTX PRO 6000 Blackwell in this env (additive; does not change torch/numpy).
+omegaconf==2.3.0
+pytorch-lightning==2.6.5
+loguru==0.7.3
+pandas==3.0.4
+matplotlib==3.10.8

@@ -1,0 +1,126 @@
+NAME: G1_seed_1024_VAE
+ACCELERATOR: 'gpu'
+NUM_NODES: 1
+DEVICE: [0]
+DEBUG: false
+SEED_VALUE: 42
+FULL_CONFIG: true
+
+TRAIN:
+  STAGE: vae
+  NUM_WORKERS: 4
+  BATCH_SIZE: 96
+  END_EPOCH: 50000
+  RESUME: ''
+  PRETRAINED: ''
+  PRECISION: 32
+  FORCE_BF16: false
+  GRADIENT_CLIP_VAL: 1.0
+  SPLIT: 'train'
+  OPTIM:
+    target: AdamW
+    params:
+      lr: 1e-4
+      betas: [0.9, 0.99]
+      weight_decay: 0.0
+  LR_SCHEDULER:
+    target: CosineAnnealingLR
+    params:
+      T_max: 50000
+      eta_min: 1e-6
+
+EVAL:
+  NUM_WORKERS: 4
+  BATCH_SIZE: 96
+  SPLIT: val
+
+TEST:
+  NUM_WORKERS: 4
+  BATCH_SIZE: 96
+  SPLIT: test
+  SAVE_PREDICTIONS: false
+  COUNT_TIME: false
+  REPLICATION_TIMES: 1
+  REP_I: 0
+
+DATASET:
+  target: multimodal_tokenizers.data.G1DataModule.G1DataModule
+  motion_representation: g1_robot
+  root_representation: velocity
+  # Absolute path to the exported G1 dataset (from stage2/export_g1_motion.py --to_yup)
+  data_dir: /scratch/user/yzdong/OMG-Data/umt/g1_seed_full_yup
+  window_size: 128
+  step_size: 64
+  normalize_motion: true
+  nfeats: 41
+  DIST_SYNC_ON_STEP: true
+  params:
+    data_dir: /scratch/user/yzdong/OMG-Data/umt/g1_seed_full_yup
+
+Selected_part: full_biomechanics
+
+model:
+  target: multimodal_tokenizers.models.biomechanics_tokenizer.BioMechanicsTokenizer
+  params:
+    condition: null
+    task: null
+    motion_vae: null
+    stage: ${TRAIN.STAGE}
+    debug: ${DEBUG}
+    codebook_size: null
+    motion_codebook_size: null
+    audio_codebook_size: null
+    metrics_dict: ${METRIC.TYPE}
+    tokenizer_arch:
+      target: multimodal_tokenizers.archs.mld_vae.MldVaeBiomechanics
+      params:
+        vae_test_dim: 41        # G1: 6D-rot(6) + lin_vel(3) + ang_vel(3) + 29 joints = 41
+        latent_dim: [1, 1024]
+        ff_size: 1536
+        num_layers: 9
+        num_heads: 8
+        dropout: 0.1
+        arch: 'encoder_decoder'
+        normalize_before: false
+        activation: 'gelu'
+        pe_type: 'actor'
+        mlp_dist: false
+
+MODEL:
+  input_dim: 41
+  latent_dim: 1024
+  vae_layer: 9
+
+LOSS:
+  LAMBDA_FEATURE: 1.0
+  LAMBDA_VELOCITY: 0.5       # joint angle velocity smoothness
+  LAMBDA_ACCELERATION: 0.0
+  LAMBDA_ROOT_VELOCITY: 1.0  # root linear velocity (slices 6:9) -- important for locomotion
+  LAMBDA_ROOT_ORIENT: 5.0    # root 6D rotation (slices 0:6) -- reduced from 10 (not Euler)
+  LAMBDA_JERK: 0.0
+  LAMBDA_KL: 1e-5
+  LAMBDA_COMMIT: 0.0
+  ABLATION:
+    RECONS_LOSS: 'l1_smooth'
+
+METRIC:
+  TYPE: []
+  DIST_SYNC_ON_STEP: true
+
+LOGGER:
+  TYPE: ['wandb']
+  VAL_EVERY_STEPS: 1
+  LOG_EVERY_N_STEPS: 10
+  WANDB:
+    target: pytorch_lightning.loggers.WandbLogger
+    params:
+      project: g1-motion-tokenizer
+      offline: false
+      id: null
+      version: ''
+      name: g1_mldvae_v1
+      save_dir: ${FOLDER_EXP}
+      tags: ['mld_vae', 'g1_robot', 'beyondmimic', 'omnimm', 'velocity_rep', 'yup', 'v1']
+
+FOLDER_EXP: ./outputs/g1_seed_1024_vae
+TIME: null

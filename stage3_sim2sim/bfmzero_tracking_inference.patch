@@ -1,0 +1,35 @@
+diff --git a/humanoidverse/tracking_inference.py b/humanoidverse/tracking_inference.py
+index d999125..49fd206 100755
+--- a/humanoidverse/tracking_inference.py
++++ b/humanoidverse/tracking_inference.py
+@@ -134,10 +134,11 @@ def main(model_folder: Path, data_path: Path | None = None, headless: bool = Tru
+     qpos, qvel = wrapped_env._get_qpos_qvel(to_numpy=True)
+     assert np.allclose(wrapped_env._env.simulator.dof_pos.clone().cpu(), expert_qpos[0,7:])
+     joint_pos = [wrapped_env._env.simulator.dof_state[..., 0].clone().cpu().numpy()]
++    exec_qpos = [np.asarray(wrapped_env._get_qpos_qvel(to_numpy=True)[0]).reshape(-1)[:36].copy()]
+ 
+     # Visualization length: match inference length so expert and policy videos align
+     episode_len = z.shape[0]
+-    episode_len = 100
++    episode_len = min(z.shape[0], 1200)  # extended to capture full fall-and-getup
+     print(f"Saving video for tracking ({episode_len} steps)")
+     if save_mp4:
+         rgb_renderer = IsaacRendererWithMuJoco(render_size=256)
+@@ -151,10 +152,17 @@ def main(model_folder: Path, data_path: Path | None = None, headless: bool = Tru
+         action = model.act(observation, z[i % len(z)].repeat(num_envs, 1), mean=True)
+         observation, reward, terminated, truncated, info = wrapped_env.step(action, to_numpy=False)
+         joint_pos.append(wrapped_env._env.simulator.dof_state[..., 0].clone().cpu().numpy())
++        exec_qpos.append(np.asarray(wrapped_env._get_qpos_qvel(to_numpy=True)[0]).reshape(-1)[:36].copy())
+         if save_mp4:
+             frames.append(rgb_renderer.render(wrapped_env._env, 0)[0])
+ 
+     joint_pos = np.stack(joint_pos, axis=0).squeeze(1)
++    # dump executed vs reference qpos_36 for apples-to-apples scoring against HoloMotion
++    executed_qpos36 = np.stack(exec_qpos, axis=0).astype(np.float32)          # [steps+1, 36] root+quat(wxyz)+dof
++    reference_qpos36 = np.asarray(expert_qpos, dtype=np.float32)[: executed_qpos36.shape[0]]
++    np.savez(output_dir / f"rollout_{MOTION_ID}.npz",
++             executed_qpos_36=executed_qpos36, reference_qpos_36=reference_qpos36)
++    print(f"Saved rollout_{MOTION_ID}.npz  executed={executed_qpos36.shape} reference={reference_qpos36.shape}")
+     stats = {}
+     
+     # breakpoint()  # use PYTHONBREAKPOINT=0 to disable, or install ipdb for a nicer debugger

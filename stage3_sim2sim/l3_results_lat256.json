@@ -1,0 +1,50 @@
+[
+  {
+    "clip": "injured_torso_walk_forward_002__A057",
+    "decode_joint_rmse_deg": 5.2,
+    "orig_survival": 1.0,
+    "orig_track_deg": 16.4,
+    "decoded_survival": 1.0,
+    "decoded_track_deg": 15.8
+  },
+  {
+    "clip": "dance_hiphop_running_man_4_direction",
+    "decode_joint_rmse_deg": 11.04,
+    "orig_survival": 1.0,
+    "orig_track_deg": 11.4,
+    "decoded_survival": 1.0,
+    "decoded_track_deg": 11.0
+  },
+  {
+    "clip": "injured_R_leg_kick_trash_001__A069_M",
+    "decode_joint_rmse_deg": 4.19,
+    "orig_survival": 1.0,
+    "orig_track_deg": 12.9,
+    "decoded_survival": 1.0,
+    "decoded_track_deg": 12.3
+  },
+  {
+    "clip": "box_jump_003__A360_M:v0",
+    "decode_joint_rmse_deg": 9.99,
+    "orig_survival": 0.766,
+    "orig_track_deg": 24.2,
+    "decoded_survival": 0.812,
+    "decoded_track_deg": 20.9
+  },
+  {
+    "clip": "dance_basic_chaines_180_R_001__A307_",
+    "decode_joint_rmse_deg": 1.55,
+    "orig_survival": 1.0,
+    "orig_track_deg": 10.3,
+    "decoded_survival": 1.0,
+    "decoded_track_deg": 10.3
+  },
+  {
+    "clip": "jog_in_place_increasing_speed_back_u",
+    "decode_joint_rmse_deg": 13.12,
+    "orig_survival": 1.0,
+    "orig_track_deg": 25.7,
+    "decoded_survival": 1.0,
+    "decoded_track_deg": 13.4
+  }
+]

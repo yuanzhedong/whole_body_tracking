@@ -1,0 +1,342 @@
+"""Step 1 of the G1->OmniMM modality pipeline (see stage2/g1_omnimm_modality_spec.md).
+
+Exports BeyondMimic motion clips (artifacts/<name>:v0/motion.npz) into a UniMoTok-ready
+G1 motion dataset:
+  - 41-D heading-canonicalized *velocity* representation per frame (matches OmniMM's
+    biomech rep style: 6-D root rot + root lin/ang vel + 29 joint angles),
+  - resampled 50 -> target fps,
+  - split by clip (or by category) into train/val/test (no window leakage),
+  - optional quality filter on per-clip tracking metrics,
+  - **over-preserved FK ground truth** (body_pos_w, joint_pos, root_quat) so the eval
+    (FK-MPJPE, joint-angle error, joint-limit %) never needs a re-export,
+  - per-dim mean/std computed on TRAIN frames only.
+
+NOTE ON DATA SOURCE: artifacts/*/motion.npz are the *reference* (retargeted) motions the
+tracking policy imitates -- not the policy's executed rollout. For v1 we train on the
+reference and rely on the quality filter (only keep clips the policy tracks well, so the
+reference is provably realizable). A later flag can point at policy-rollout npz instead.
+
+TODO (AMASS): AMASS clips (amass_*) are excluded for now -- they are too short after
+resampling (< 128 frames at 20 fps) and would need a separate curation pass. Re-enable
+by removing the AMASS_SKIP check once a larger AMASS corpus is retargeted via
+retargeting/ and verified with Stage-0 tracking quality >= 0.95.
+
+z-up / y-up:
+  Isaac Sim is z-up; OmniMM's convention is y-up.  The --to_yup flag implements the
+  basis change (T: z-up->y-up = [[1,0,0],[0,0,1],[0,-1,0]]) and verifies the sanity
+  check (mean root height > 0.5 m in the new frame).  It is OFF by default; run once
+  with --to_yup --verify_only to inspect the printed checks before training.
+
+Run (no Isaac needed -- pure numpy/scipy):
+  .venv/bin/python stage2/export_g1_motion.py --artifacts_dir artifacts \
+      --out_dir stage2/out/g1_dataset --target_fps 20
+  # y-up (OmniMM convention), quality-filtered:
+  #   ... --to_yup --quality_json stage2/out/track_quality.json
+"""
+import argparse, os, json, glob, hashlib
+import numpy as np
+from scipy.spatial.transform import Rotation, Slerp
+
+# z-up (Isaac) -> y-up (OmniMM): new_x=old_x, new_y=old_z, new_z=-old_y
+# Verified: T @ [0,0,1] = [0,1,0] (up stays up), det(T)=1 (proper rotation, no flip).
+T_ZUP_TO_YUP = np.array([[1, 0, 0], [0, 0, 1], [0, -1, 0]], dtype=np.float64)
+
+# Canonical native order (matches motion.npz joint_pos / body_pos_w; captured from the G1 asset).
+JOINT_NAMES = [
+    "left_hip_pitch_joint", "right_hip_pitch_joint", "waist_yaw_joint", "left_hip_roll_joint",
+    "right_hip_roll_joint", "waist_roll_joint", "left_hip_yaw_joint", "right_hip_yaw_joint",
+    "waist_pitch_joint", "left_knee_joint", "right_knee_joint", "left_shoulder_pitch_joint",
+    "right_shoulder_pitch_joint", "left_ankle_pitch_joint", "right_ankle_pitch_joint",
+    "left_shoulder_roll_joint", "right_shoulder_roll_joint", "left_ankle_roll_joint",
+    "right_ankle_roll_joint", "left_shoulder_yaw_joint", "right_shoulder_yaw_joint",
+    "left_elbow_joint", "right_elbow_joint", "left_wrist_roll_joint", "right_wrist_roll_joint",
+    "left_wrist_pitch_joint", "right_wrist_pitch_joint", "left_wrist_yaw_joint", "right_wrist_yaw_joint",
+]
+ROOT_BODY_INDEX = 0  # 'pelvis'
+FEATURE_LAYOUT = {"root_rot6d": [0, 6], "root_lin_vel": [6, 9], "root_ang_vel": [9, 12], "joint_pos": [12, 41]}
+FEATURE_DIM = 41
+
+CATEGORY_KEYWORDS = [  # ordered; first match wins
+    ("sprint", "sprint"), ("run", "run"), ("walk", "walk"), ("dance", "dance"),
+    ("jump", "jump"), ("fight", "fight"), ("fall", "fall"), ("sport", "sport"),
+]
+
+
+def categorize(name):
+    low = name.lower()
+    for kw, cat in CATEGORY_KEYWORDS:
+        if kw in low:
+            return cat
+    return "other"
+
+
+def mirror_pairs():
+    """Index pairs (l, r) for left/right joints; used later for mirror augmentation."""
+    idx = {n: i for i, n in enumerate(JOINT_NAMES)}
+    pairs = []
+    for n, i in idx.items():
+        if n.startswith("left_"):
+            r = "right_" + n[len("left_"):]
+            if r in idx:
+                pairs.append([i, idx[r]])
+    return pairs
+
+
+def resample_linear(x, t_in, t_out):
+    """Linear-interp x[T,...] along axis 0 to t_out."""
+    flat = x.reshape(x.shape[0], -1)
+    out = np.stack([np.interp(t_out, t_in, flat[:, c]) for c in range(flat.shape[1])], axis=1)
+    return out.reshape(t_out.shape[0], *x.shape[1:])
+
+
+def quat_wxyz_to_xyzw(q):
+    return q[..., [1, 2, 3, 0]]
+
+
+def yaw_zup(R):
+    """Heading angle about +z (z-up frame): atan2(R[1,0], R[0,0])."""
+    return np.arctan2(R[:, 1, 0], R[:, 0, 0])
+
+
+def yaw_yup(R):
+    """Heading angle about +y (y-up frame): atan2(-R[2,0], R[0,0])."""
+    return np.arctan2(-R[:, 2, 0], R[:, 0, 0])
+
+
+def rotz(a):
+    """Batch rotation matrices about z by angles a[T]."""
+    c, s = np.cos(a), np.sin(a)
+    R = np.zeros((a.shape[0], 3, 3))
+    R[:, 0, 0] = c; R[:, 0, 1] = -s; R[:, 1, 0] = s; R[:, 1, 1] = c; R[:, 2, 2] = 1.0
+    return R
+
+
+def roty(a):
+    """Batch rotation matrices about y by angles a[T]."""
+    c, s = np.cos(a), np.sin(a)
+    R = np.zeros((a.shape[0], 3, 3))
+    R[:, 0, 0] = c; R[:, 0, 2] = s; R[:, 1, 1] = 1.0; R[:, 2, 0] = -s; R[:, 2, 2] = c
+    return R
+
+
+def apply_basis(T, pos, rotmats):
+    """Apply basis-change matrix T to positions [N,3] and rotation matrices [N,3,3]."""
+    pos_new = (T @ pos.T).T
+    rotmats_new = T @ rotmats @ T.T
+    return pos_new, rotmats_new
+
+
+def build_features(root_pos, root_quat_xyzw, joint_pos, dt, to_yup=False):
+    """root_pos[T,3], root_quat_xyzw[T,4], joint_pos[T,29] -> features[T,41]."""
+    R = Rotation.from_quat(root_quat_xyzw).as_matrix()  # [T,3,3]
+
+    if to_yup:
+        root_pos, R = apply_basis(T_ZUP_TO_YUP, root_pos, R)
+        yaw = yaw_yup(R)
+        R_strip_inv = roty(-yaw)
+    else:
+        yaw = yaw_zup(R)
+        R_strip_inv = rotz(-yaw)
+
+    R_canon = np.einsum("tij,tjk->tik", R_strip_inv, R)
+    rot6d = R_canon[:, :, :2].transpose(0, 2, 1).reshape(-1, 6)  # first two cols
+
+    lin_vel_w = np.gradient(root_pos, dt, axis=0)
+    lin_vel_local = np.einsum("tij,tj->ti", R_strip_inv, lin_vel_w)
+    rel = Rotation.from_matrix(R[1:] @ np.transpose(R[:-1], (0, 2, 1)))
+    ang_w = rel.as_rotvec() / dt
+    ang_w = np.concatenate([ang_w[:1], ang_w], axis=0)
+    ang_vel_local = np.einsum("tij,tj->ti", R_strip_inv, ang_w)
+
+    return np.concatenate([rot6d, lin_vel_local, ang_vel_local, joint_pos], axis=1).astype(np.float32)
+
+
+def process_clip(path, target_fps, to_yup=False):
+    d = np.load(path, allow_pickle=True)
+    in_fps = int(np.asarray(d["fps"]).reshape(-1)[0])
+    nframes = d["joint_pos"].shape[0]
+    dur = (nframes - 1) / in_fps
+    t_in = np.arange(nframes) / in_fps
+    t_out = np.arange(0.0, dur + 1e-9, 1.0 / target_fps)
+
+    joint_pos = resample_linear(d["joint_pos"][:, :29], t_in, t_out)     # [T,29]
+    body_pos_w = resample_linear(d["body_pos_w"], t_in, t_out)            # [T,30,3]
+    root_q_xyzw = quat_wxyz_to_xyzw(d["body_quat_w"][:, ROOT_BODY_INDEX, :])
+    root_quat_rs = Slerp(t_in, Rotation.from_quat(root_q_xyzw))(
+        np.clip(t_out, t_in[0], t_in[-1])).as_quat()                      # xyzw [T,4]
+    root_pos = body_pos_w[:, ROOT_BODY_INDEX, :]                          # z-up
+    root_pos_z = root_pos.copy()                                          # keep z-up for features
+    root_quat_z = root_quat_rs.copy()                                     # keep z-up xyzw for features
+
+    if to_yup:
+        # Convert FK ground truth to y-up so eval metrics live in the same frame as features.
+        body_pos_w = np.einsum("ij,tbj->tbi", T_ZUP_TO_YUP, body_pos_w)
+        R_yup = T_ZUP_TO_YUP @ Rotation.from_quat(root_quat_rs).as_matrix() @ T_ZUP_TO_YUP.T
+        root_quat_rs = Rotation.from_matrix(R_yup).as_quat()              # xyzw y-up (raw/eval only)
+
+    # Features: build_features applies the SINGLE z-up->y-up conversion internally when to_yup.
+    # (Previously the root was pre-converted to y-up AND build_features converted it again -> a
+    #  double basis change that put "up" on -z and corrupted the inverted world-root height. We
+    #  now pass z-up inputs so the conversion happens exactly once and the inverse recovers root.)
+    feats = build_features(root_pos_z, root_quat_z, joint_pos,
+                           1.0 / target_fps, to_yup=to_yup)
+    raw = {"joint_pos": joint_pos.astype(np.float32),
+           "body_pos_w": body_pos_w.astype(np.float32),
+           "root_quat_xyzw": root_quat_rs.astype(np.float32),
+           "fps": np.array([target_fps])}
+    return feats, raw, in_fps, nframes
+
+
+def assign_split(name, val_ratio, test_ratio):
+    h = int(hashlib.md5(name.encode()).hexdigest(), 16) % 1000 / 1000.0
+    if h < test_ratio:
+        return "test"
+    if h < test_ratio + val_ratio:
+        return "val"
+    return "train"
+
+
+def main():
+    p = argparse.ArgumentParser()
+    p.add_argument("--artifacts_dir", default="artifacts")
+    p.add_argument("--out_dir", default="stage2/out/g1_dataset")
+    p.add_argument("--target_fps", type=int, default=20)
+    p.add_argument("--window", type=int, default=128, help="window size for the #windows stat / datamodule")
+    p.add_argument("--val_ratio", type=float, default=0.1)
+    p.add_argument("--test_ratio", type=float, default=0.1)
+    p.add_argument("--split_mode", choices=["clip", "category", "within_clip"], default="clip",
+                   help="within_clip: hold out last val_ratio of windows from each clip "
+                        "(in-distribution val, avoids OOD/overlap problems)")
+    p.add_argument("--holdout_categories", nargs="*", default=[], help="category-mode: these go entirely to test")
+    p.add_argument("--quality_json", default=None, help="{clip: {survival, e_mpbpe_mm}}; clips failing thresholds are dropped")
+    p.add_argument("--min_survival", type=float, default=0.95)
+    p.add_argument("--max_mpbpe_mm", type=float, default=50.0)
+    p.add_argument("--to_yup", action="store_true",
+                   help="convert z-up (Isaac) -> y-up (OmniMM convention). "
+                        "Run with --verify_only first to inspect the sanity check printout.")
+    p.add_argument("--verify_only", action="store_true",
+                   help="run one clip with --to_yup, print sanity checks, then exit (no files written)")
+    p.add_argument("--include_clips", nargs="*", default=None,
+                   help="whitelist of clip names to include (e.g. walk1_subject1 lafan_run1_subject2). "
+                        "If omitted, all non-amass clips are included.")
+    args = p.parse_args()
+
+    quality = json.load(open(args.quality_json)) if args.quality_json else None
+    if quality is None:
+        print("WARNING: no --quality_json -> tracking-quality filter DISABLED (all clips included). "
+              "Run stage2/eval_tracking_quality.py then re-export with --quality_json "
+              "before scaling experiments.")
+
+    paths = sorted(glob.glob(os.path.join(args.artifacts_dir, "*", "motion.npz")))
+    if not paths:
+        raise SystemExit(f"no motion.npz under {args.artifacts_dir}/*/")
+
+    # --verify_only: sanity-check y-up on one clip then exit.
+    if args.verify_only:
+        if not args.to_yup:
+            raise SystemExit("--verify_only requires --to_yup")
+        feats, raw, _, _ = process_clip(paths[0], args.target_fps, to_yup=True)
+        root_height = raw["body_pos_w"][:, ROOT_BODY_INDEX, 1]  # y-axis in y-up = height
+        print(f"y-up sanity check on {os.path.basename(os.path.dirname(paths[0]))}:")
+        print(f"  mean root height (y-axis) = {root_height.mean():.3f} m  (expect ~0.7-1.0 for standing G1)")
+        print(f"  root_rot6d range: [{feats[:,0:6].min():.3f}, {feats[:,0:6].max():.3f}]  (expect ~[-1,1])")
+        print(f"  root_lin_vel range: [{feats[:,6:9].min():.3f}, {feats[:,6:9].max():.3f}]")
+        ok = 0.5 < root_height.mean() < 1.5
+        print(f"  SANITY {'PASS' if ok else 'FAIL -- check basis change'}")
+        return
+
+    for s in ["train", "val", "test"]:
+        os.makedirs(os.path.join(args.out_dir, s), exist_ok=True)
+
+    manifest, train_frames, n_inc, n_drop, n_todo = {}, [], 0, 0, 0
+    for path in paths:
+        name = os.path.basename(os.path.dirname(path)).replace(":v0", "")
+
+        # TODO (AMASS): short clips need a larger AMASS corpus retargeted via retargeting/.
+        # Re-enable once clips have >= 128 frames at target_fps and pass quality filter.
+        if name.startswith("amass_"):
+            print(f"  TODO  {name}: AMASS excluded (see TODO in docstring)")
+            n_todo += 1
+            continue
+
+        if args.include_clips is not None and name not in args.include_clips:
+            print(f"  skip  {name}: not in --include_clips whitelist")
+            continue
+
+        cat = categorize(name)
+        q = quality.get(name) if quality else None
+        if quality is not None:
+            if q is None:
+                print(f"  drop  {name}: no quality entry"); n_drop += 1; continue
+            if q.get("survival", 0) < args.min_survival or q.get("e_mpbpe_mm", 1e9) > args.max_mpbpe_mm:
+                print(f"  drop  {name}: survival={q.get('survival'):.3f} mpbpe={q.get('e_mpbpe_mm'):.1f}mm")
+                n_drop += 1; continue
+
+        feats, raw, in_fps, nfr = process_clip(path, args.target_fps, to_yup=args.to_yup)
+
+        if args.split_mode == "within_clip":
+            # Hold out last val_ratio of windows from EACH clip as val (in-distribution).
+            # Both halves get saved; the DataModule uses all frames, but we save to
+            # separate split dirs so val never bleeds into normalization stats.
+            T = feats.shape[0]
+            cut = max(args.window, int(T * (1 - args.val_ratio)))
+            feats_train = feats[:cut]
+            feats_val   = feats[cut - args.window + 1:]  # overlap by window-1 for clean windows
+            np.savez(os.path.join(args.out_dir, "train", name + ".npz"),
+                     motion=feats_train, category=cat, **{k: raw[k][:cut] if hasattr(raw[k],'__len__') and len(raw[k])==T else raw[k] for k in raw})
+            np.savez(os.path.join(args.out_dir, "val",   name + "_val.npz"),
+                     motion=feats_val,   category=cat, **{k: raw[k][cut-args.window+1:] if hasattr(raw[k],'__len__') and len(raw[k])==T else raw[k] for k in raw})
+            train_frames.append(feats_train)
+            split = "within_clip(train+val)"
+            n_win_tr = max(0, feats_train.shape[0] - args.window + 1)
+            n_win_va = max(0, feats_val.shape[0]   - args.window + 1)
+            manifest[name] = {"split": split, "category": cat, "n_frames_in": int(nfr),
+                               "n_frames_out": int(T), "in_fps": in_fps,
+                               "out_fps": args.target_fps,
+                               "n_windows_train": int(n_win_tr), "n_windows_val": int(n_win_va), "quality": q}
+            n_inc += 1
+            print(f"  ok    {name:38s} {cat:7s} within  {nfr:6d}@{in_fps} -> {T:5d}@{args.target_fps}  train_win={n_win_tr} val_win={n_win_va}")
+            continue
+
+        if args.split_mode == "category":
+            split = "test" if cat in args.holdout_categories else assign_split(name, args.val_ratio, 0.0)
+        else:
+            split = assign_split(name, args.val_ratio, args.test_ratio)
+
+        np.savez(os.path.join(args.out_dir, split, name + ".npz"),
+                 motion=feats, category=cat, **raw)
+        if split == "train":
+            train_frames.append(feats)
+        n_win = max(0, feats.shape[0] - args.window + 1)
+        manifest[name] = {"split": split, "category": cat, "n_frames_in": int(nfr),
+                          "n_frames_out": int(feats.shape[0]), "in_fps": in_fps,
+                          "out_fps": args.target_fps, "n_windows": int(n_win), "quality": q}
+        n_inc += 1
+        print(f"  ok    {name:38s} {cat:7s} {split:5s} {nfr:6d}@{in_fps} -> {feats.shape[0]:5d}@{args.target_fps}  win={n_win}")
+
+    if not train_frames:
+        raise SystemExit("no TRAIN clips -> cannot compute normalization (loosen filter / ratios)")
+    allf = np.concatenate(train_frames, axis=0)
+    mean = allf.mean(0).astype(np.float32)
+    std = np.maximum(allf.std(0), 1e-6).astype(np.float32)
+    np.savez(os.path.join(args.out_dir, "normalization.npz"), mean=mean, std=std)
+
+    up_axis = "y" if args.to_yup else "z"
+    meta = {"feature_dim": FEATURE_DIM, "feature_layout": FEATURE_LAYOUT, "target_fps": args.target_fps,
+            "window": args.window, "up_axis": up_axis, "root_body_index": ROOT_BODY_INDEX,
+            "joint_names": JOINT_NAMES, "mirror_pairs": mirror_pairs(),
+            "data_source": "beyondmimic_reference_motion", "quality_filtered": quality is not None,
+            "n_included": n_inc, "n_dropped": n_drop, "n_todo": n_todo, "clips": manifest}
+    json.dump(meta, open(os.path.join(args.out_dir, "manifest.json"), "w"), indent=2)
+
+    counts = {s: sum(1 for c in manifest.values() if c["split"] == s) for s in ["train", "val", "test"]}
+    tot_win = {s: sum(c["n_windows"] for c in manifest.values() if c["split"] == s) for s in ["train", "val", "test"]}
+    print(f"\nincluded {n_inc} clips, dropped {n_drop}, todo {n_todo} -> {args.out_dir}")
+    print(f"  split clips:   {counts}")
+    print(f"  split windows: {tot_win}")
+    print(f"  feature_dim {FEATURE_DIM}, fps {args.target_fps}, up_axis {up_axis}")
+    print(f"  normalization: mean/std over {allf.shape[0]} train frames")
+
+
+if __name__ == "__main__":
+    main()
