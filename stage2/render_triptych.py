@@ -2,7 +2,7 @@
 
 Pure orchestrator (mujoco EGL and pyrender EGL can't share one env):
   * robot panels  -> robot_frames.py in .venv-bfm  (working mujoco EGL)
-  * human panel   -> render_human_skel.py in .venv6 (BVH FK skeleton, pyrender)
+  * human panel   -> render_human_mesh.py in .venv6 (SOMA/MHR mesh, pyrender)
 then stitches the frames into an mp4. Run with any python.
 """
 import argparse
@@ -54,7 +54,7 @@ def main():
 
     hum_npy = tempfile.mktemp(suffix=".npy")
     rob_npz = tempfile.mktemp(suffix=".npz")
-    subprocess.run([VENV6, str(HERE / "render_human_skel.py"), "--bvh", bvh[0],
+    subprocess.run([VENV6, str(HERE / "render_human_mesh.py"), "--bvh", bvh[0],
                     "--out-npy", hum_npy, "--n-frames", str(n_out)],
                    check=True, env=dict(env, PYOPENGL_PLATFORM="egl"))
     subprocess.run([VENVBFM, str(HERE / "robot_frames.py"), "--rollout", args.rollout,

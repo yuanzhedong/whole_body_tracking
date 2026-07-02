@@ -81,12 +81,12 @@ blocks = [
 
     wr.H2(text="Triptych — [ human motion | G1 reference | G1 executed ]"),
     md(text=(
-        "The full pipeline output: the **human motion** (BONES-SEED `soma_uniform` BVH, downloaded "
-        "from HuggingFace and rendered as an FK skeleton via SOMA-X's bundled MHR rig — **no gated "
-        "SMPL models needed**), the **G1 reference** retarget, and the **BFM-Zero executed** rollout, "
-        "time-aligned at 1440×480. Both tracks are reproduced on this box "
-        "(`stage2/render_triptych.py`). _The human is shown as a skeleton; the SOMA/MHR **mesh** "
-        "renders (verified in T-pose) but its per-joint pose convention is a documented refinement._")),
+        "The full pipeline output: the **human motion** as a **SOMA/MHR body mesh** (BONES-SEED "
+        "`soma_uniform` BVH → SOMA-X's bundled **MHR** rig — **no gated SMPL models needed**), the "
+        "**G1 reference** retarget, and the **BFM-Zero executed** rollout, time-aligned at 1440×480. "
+        "Both tracks are reproduced on this box (`stage2/render_triptych.py` + `render_human_mesh.py`). "
+        "The BVH→SOMA pose uses the `demo_soma_vis` convention (local→world FK, rest-frame correction, "
+        "`pose2rot=False`).")),
     wr.PanelGrid(runsets=[runset()],
                  panels=[wr.MediaBrowser(media_keys=trip_keys[i:i + 2], num_columns=2)
                          for i in range(0, min(12, len(trip_keys)), 2)]),
